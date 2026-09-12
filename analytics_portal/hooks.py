@@ -154,24 +154,23 @@ app_license = "mit"
 
 # Scheduled Tasks
 # ---------------
+# See docs/04_BACKEND_RULES.md §8. Each cron entry below calls a thin
+# `enqueue_*` function that pushes the real job onto the "long" queue —
+# never the default queue interactive requests share.
 
-# scheduler_events = {
-# 	"all": [
-# 		"analytics_portal.tasks.all"
-# 	],
-# 	"daily": [
-# 		"analytics_portal.tasks.daily"
-# 	],
-# 	"hourly": [
-# 		"analytics_portal.tasks.hourly"
-# 	],
-# 	"weekly": [
-# 		"analytics_portal.tasks.weekly"
-# 	],
-# 	"monthly": [
-# 		"analytics_portal.tasks.monthly"
-# 	],
-# }
+scheduler_events = {
+	"cron": {
+		"0 1 * * *": [
+			"analytics_portal.jobs.recompute_monthly_stats.enqueue_recompute_monthly_stats",
+		],
+		"30 1 * * *": [
+			"analytics_portal.jobs.recompute_overall_stats.enqueue_recompute_overall_stats",
+		],
+		"0 2 * * *": [
+			"analytics_portal.jobs.recompute_org_daily_stats.enqueue_recompute_org_daily_stats",
+		],
+	},
+}
 
 # Testing
 # -------
