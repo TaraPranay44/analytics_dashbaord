@@ -97,8 +97,8 @@ what's listed here without flagging it as a deviation.
 - **Widgets:** prefer small, composed widgets over large `build()` methods; a
   `build()` over ~80 lines should be broken into sub-widgets
 - **Providers:** named `xxxProvider`, one provider per ViewModel responsibility
-  (e.g. `employeeSummaryProvider`, `employeeLogsPageProvider`) — not one giant
-  app-wide provider
+  (e.g. `employeeListPageProvider`, `employeeDetailProvider`, `employeeLogsPageProvider`)
+  — not one giant app-wide provider
 - **No Dio or Isar imports outside `data/`** — enforced by the layer boundary in §1
 - **No literals** for endpoint paths, cache-box names, or page sizes — pull from
   `core/constants/` (§7)
@@ -152,18 +152,32 @@ lib/
 │   │       ├── org_repository_impl.dart
 │   │       ├── org_remote_data_source.dart   # Dio calls
 │   │       └── org_local_data_source.dart    # Isar cache
-│   ├── employee_search/
-│   │   ├── presentation/ (view + view_model)
-│   │   ├── domain/ (entities/use_cases)
+│   ├── employee_list/                 # renamed from employee_search — see correction note below
+│   │   ├── presentation/
+│   │   │   ├── employee_list_view.dart      # paginated list — NO inline charts, NO per-row summary
+│   │   │   ├── employee_list_item.dart      # single compact row widget
+│   │   │   └── employee_list_view_model.dart
+│   │   ├── domain/ (entities/use_cases — EmployeeListItem entity is intentionally
+│   │   │             narrower than the EmployeeDetail entity, not a slice of it)
 │   │   └── data/ (repository_impl, remote/local data sources)
 │   └── employee_detail/
-│       ├── presentation/ (view + view_model)
+│       ├── presentation/
+│       │   ├── employee_detail_view.dart    # summary metrics + trend chart + activity log
+│       │   ├── employee_trend_chart.dart    # the per-employee chart — lives ONLY here
+│       │   └── employee_detail_view_model.dart
 │       ├── domain/ (entities/use_cases)
 │       └── data/ (repository_impl, remote/local data sources)
 └── shared/
-    ├── widgets/                       # shared dumb widgets (SummaryCard, DateRangeFilter, etc.)
+    ├── widgets/                       # shared dumb widgets (DateRangeFilter, PaginationBar, FilterChip, etc.)
     └── theme/
 ```
+
+> **⚠️ Correction note (post-review):** this feature was originally `employee_search`,
+> paired with a single-result summary widget — as if a name search always resolves
+> to one employee. It doesn't; a common name can match hundreds of the 30,000
+> employees. It's renamed to **`employee_list`**, is always paginated
+> (`PaginationBar` in `shared/widgets/`), and its rows never carry charts or
+> multi-metric summaries — that content exists only in `employee_detail`.
 
 **Rule:** every feature folder repeats the same three sub-layers
 (`presentation/domain/data`) — no feature skips a layer, even if a layer is thin.
@@ -207,6 +221,14 @@ appear inline in a widget/provider/repository — import from these files.
 - ❌ Building Manager/Employee login buttons as dead ends instead of routing to
   `coming_soon_view.dart`
 - ❌ Adding a second state-management or local-storage package alongside Riverpod/Isar
+- ❌ **Rendering a single rich "summary" widget (avatar + metrics + chart) as a
+  search result or list row.** A common name can match hundreds of the 30,000
+  employees — `employee_list_item.dart` is one compact row, full stop. Charts and
+  multi-metric summaries belong only in `employee_detail_view.dart`.
+- ❌ Loose, over-padded list/table screens. `employee_list_view.dart` and the
+  activity-log view are dense, frequently-scanned executive tools — keep row
+  height and spacing tight and legible; save generous whitespace for the
+  hero/login screen, not for list screens.
 
 ---
 

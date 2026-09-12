@@ -21,9 +21,14 @@ The core deliverable from the original brief, built correctly for scale from the
 - Web app (Vue 3 + `frappe-ui`, Pinia + TanStack Query):
   - Login screen with **CEO / Manager / Employee** buttons — only CEO active,
     Manager/Employee route to a "coming soon" placeholder
-  - CEO landing dashboard: org-wide tiles + auto-completing employee search
-  - Employee summary card + "view full history" action
-  - Employee Detail Page: summary metrics, paginated activity log table, date-range filter
+  - CEO landing dashboard: org-wide tiles + auto-completing employee search + filters
+  - **Paginated, filterable employee list** (compact rows — no inline charts; a
+    common-name search can return hundreds of matches, so this must page, not
+    single-card) — corrected from an earlier "employee summary card" version of
+    this doc, which assumed a search returns one match
+  - Employee Detail Page: summary metrics, **trend chart(s)**, paginated activity
+    log table, date-range filter — all the rich per-employee analytics live here,
+    reached by clicking a row in the list
   - Simple line-management/hierarchy view
 
 **Exit criteria:** CEO can search any of 30,000 employees in ~1s, and open a full
@@ -40,8 +45,8 @@ the backend API contract.
 - Dio for networking against the Phase 1 API layer (no new backend endpoints needed)
 - Isar for local caching of last-fetched summaries/logs (offline-friendly reads)
 - Same three-button login screen (CEO active, Manager/Employee "coming soon")
-- CEO experience: search, summary card, detail page, date-range filters — parity
-  with web, not a subset
+- CEO experience: search + filters, paginated employee list, detail page (with
+  trend chart + activity log) — parity with web, not a subset
 
 **Exit criteria:** CEO can do everything on mobile that they can on web, against the
 exact same API — no parallel backend logic written for mobile.

@@ -95,7 +95,7 @@ what's listed here without flagging it as a deviation.
 
 - **Language:** TypeScript everywhere (no plain `.js` files for app logic)
 - **Components:** `<script setup lang="ts">`, PascalCase filenames (`EmployeeCard.vue`)
-- **Composables:** camelCase filenames prefixed `use` (`useEmployeeSearch.ts`),
+- **Composables:** camelCase filenames prefixed `use` (`useEmployeeList.ts`),
   always return a plain object of refs/computed/functions — never return a raw
   reactive object where callers can mutate internals directly
 - **No inline literals** for route paths, endpoint paths, or labels — pull from
@@ -125,36 +125,53 @@ what's listed here without flagging it as a deviation.
 
 ## 6. File / folder structure (exact — do not deviate)
 
+> **⚠️ Correction note (post-review):** the landing `DashboardView` was originally
+> paired with a single `EmployeeSummaryCard` component, as if a search always
+> resolves to one employee. It doesn't — a common name can match hundreds of the
+> 30,000 employees. `EmployeeSummaryCard` (with its inline charts) is **removed
+> from the landing page entirely** and now only appears inside `EmployeeDetailView`.
+> The landing page instead uses a new `EmployeeListTable` + `EmployeeListRow` +
+> `Pagination` + `FilterBar` set of components, backed by `useEmployeeList` (renamed
+> from `useEmployeeSearch`). `useEmployeeSummary` is removed as a separate
+> composable — its data is now part of `useEmployeeDetail`, matching the backend's
+> merged `employee_detail` endpoint (`04_BACKEND_RULES.md §5`).
+
 ```
 src/
 ├── views/                       # Views (screens/pages)
 │   ├── LoginView.vue             # 3 role buttons: CEO / Manager / Employee
-│   ├── DashboardView.vue         # CEO landing dashboard
-│   ├── EmployeeDetailView.vue
+│   ├── DashboardView.vue         # CEO landing page: org tiles + search/filters + employee list
+│   ├── EmployeeDetailView.vue     # per-employee dashboard: summary, trend chart, activity log
 │   └── ComingSoonView.vue        # placeholder for Manager/Employee (future scope)
 ├── components/                  # Reusable dumb UI components (Views, per MVVM)
 │   ├── EmployeeSearchBar.vue
-│   ├── EmployeeSummaryCard.vue
+│   ├── FilterBar.vue              # manager filter, sort control — sits alongside the search bar
+│   ├── EmployeeListTable.vue       # paginated, compact rows — NO charts, NO multi-metric summary
+│   ├── EmployeeListRow.vue         # single row: avatar, name/ID, manager, avg hrs/day, avg login, status
+│   ├── Pagination.vue              # "Showing X–Y of Z" + Prev/Next, used by EmployeeListTable
+│   ├── EmployeeSummaryPanel.vue    # rich metrics block — EmployeeDetailView ONLY, never the landing list
+│   ├── EmployeeTrendChart.vue      # the per-employee chart — EmployeeDetailView ONLY
 │   ├── ActivityLogTable.vue
 │   ├── DateRangeFilter.vue
 │   └── OrgHierarchyView.vue
 ├── composables/                 # ViewModels
-│   ├── useEmployeeSearch.ts
-│   ├── useEmployeeSummary.ts
+│   ├── useEmployeeList.ts         # paginated list/search — renamed from useEmployeeSearch
+│   ├── useEmployeeDetail.ts       # full detail incl. summary metrics + trend series (was useEmployeeSummary)
 │   ├── useEmployeeLogs.ts
 │   ├── useOrgDashboard.ts
 │   └── useDateRangeFilter.ts
 ├── api/                         # Model — data layer
 │   ├── client.ts                 # frappe-ui-based HTTP client setup
-│   ├── employeeApi.ts            # calls employee_search / employee_summary / employee_detail
+│   ├── employeeApi.ts            # calls employee_list / employee_detail
 │   ├── logsApi.ts                # calls employee_logs
 │   └── orgApi.ts                 # calls org_dashboard / org_hierarchy
 ├── types/
-│   ├── employee.ts
+│   ├── employee.ts                # includes a distinct EmployeeListRow type vs. EmployeeDetail type —
+│   │                               # the list row is intentionally a narrower shape, not a slice of detail
 │   ├── activityLog.ts
 │   └── apiResponse.ts             # shared { data, start, limit, has_more } shape
 ├── store/                        # Pinia — UI-only state
-│   ├── uiFilterStore.ts
+│   ├── uiFilterStore.ts           # current q, manager filter, sort, page — landing list UI state
 │   └── authRoleStore.ts           # which role button was selected (CEO active only)
 ├── router/
 │   └── index.ts
@@ -203,6 +220,15 @@ inline in a component or composable — import from these files.
 - ❌ Building the Manager/Employee login buttons as non-functional dead links with
   no route at all (they must route to `ComingSoonView.vue`, not 404)
 - ❌ Adding a second charting or state-management library alongside the ones in §3
+- ❌ **Rendering a single "summary card" (with avatar, metrics, and a chart) as the
+  result of a search or as a row in a list.** A list is a list — one compact row
+  per employee, no inline chart, no multi-line metric block. Charts and rich
+  summaries belong only in `EmployeeDetailView`, never in `EmployeeListRow`.
+- ❌ Sparse layouts with large unused margins/whitespace on data-dense screens
+  (the landing list, the activity log). These are executive tools reviewed
+  frequently — favor information density (compact row height, tight but legible
+  spacing) over decorative empty space. Reserve generous whitespace for the
+  hero/login screen, not for list or table views.
 
 ---
 

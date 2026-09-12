@@ -89,8 +89,23 @@ directly. API → Service → Repository → DB, always in that order, no skippi
 | Redis (`redis` service, not a Frappe app) | Cache + job broker | Already wired by Frappe's `bench` setup (`redis_cache`, `redis_queue`). Do not introduce a second cache technology. |
 | MariaDB | Primary datastore | Already wired by `bench`. Do not introduce a second database engine. |
 
+**Explicitly excluded: Frappe HR (`hrms`) / ERPNext.** `Employee` is not a core Frappe
+framework DocType — it belongs to ERPNext/HRMS. This project deliberately does
+**not** install either. Reasons, for any agent tempted to "helpfully" add it later:
+- `Employee` in our app is our own custom DocType (§4.1) — lighter, and shaped
+  exactly for this use case, not HRMS's much heavier HR-suite version
+- HRMS brings Recruitment, Leave, Payroll, Performance, Expense Claims, etc. — none
+  of which this project uses; it's schema and permission bloat with no functional gain
+- The actual hard part of this project — `Employee Monthly Stats`,
+  `Employee Overall Stats`, `Org Daily Stats`, and the nightly aggregation jobs — does
+  not exist in HRMS at all and would have to be built regardless, on top of a schema
+  we don't control if HRMS were installed
+- If leave/payroll/shift management ever becomes real scope (see
+  `03_PHASED_ROADMAP.md` Phase 4+), evaluate HRMS **then** as a deliberate decision —
+  not as a default dependency now
+
 **Rule:** do not add a new app, service, or library (e.g. Celery, a different cache,
-a different DB) without flagging it as a deviation from this doc first.
+a different DB, `hrms`/ERPNext) without flagging it as a deviation from this doc first.
 
 ---
 
@@ -169,20 +184,33 @@ table in the same change.
 
 ## 5. APIs (exact routes — do not add/rename without updating this table)
 
+> **⚠️ Correction note (post-review):** this table originally had a separate
+> `employee_search` (autocomplete, `q` required) and `employee_summary` (single-card
+> data) endpoint, implying a search always resolves to one employee. It doesn't — a
+> common name can match hundreds of the 30,000 employees. `employee_search` is
+> renamed to **`employee_list`** with `q` now **optional** (empty `q` = browse all,
+> paginated) so it can power the landing page's employee list directly.
+> `employee_summary` is **removed as a separate endpoint** — its fields are folded
+> into `employee_detail`, since the rich per-employee data (summary metrics + trend
+> series) only ever gets fetched once a specific employee is opened, never for a
+> whole page of search results.
+
 Namespace: `analytics_portal.api.v1.*`. All are `GET`, all whitelisted, all paginated
 where they return a list.
 
 | Endpoint (method name) | Purpose | Required params | Optional params |
 |---|---|---|---|
-| `employee_search` | Autocomplete by name/ID | `q` | `limit` (default `PAGE_SIZE_DEFAULT`, max `PAGE_SIZE_MAX`) |
-| `employee_summary` | Summary card data | `employee_id` | — |
-| `employee_detail` | Full detail incl. manager chain | `employee_id` | — |
-| `employee_logs` | Paginated activity log | `employee_id` | `from_date`, `to_date`, `start`, `limit` |
-| `org_dashboard` | Org-wide tiles for landing page | — | — |
+| `employee_list` | Paginated, filterable employee directory — powers the landing page. Returns **compact rows only** (name, ID, manager, avg hours/day, avg login, status) — no charts, no multi-metric detail. | — | `q` (name/ID search, empty = browse all), `manager` (filter), `sort`, `start`, `limit` (default `PAGE_SIZE_DEFAULT`, max `PAGE_SIZE_MAX`) |
+| `employee_detail` | Full detail for ONE employee: identity, manager chain, DOJ, summary metrics (avg/day, avg login, avg logout, attendance %), and a trend series (e.g. daily hours for the last 30 days) for the detail-page chart | `employee_id` | — |
+| `employee_logs` | Paginated day-by-day activity log for one employee | `employee_id` | `from_date`, `to_date`, `start`, `limit` |
+| `org_dashboard` | Org-wide tiles for landing page header | — | — |
 | `org_hierarchy` | Manager chain / direct reports | `employee_id` | — |
 
 **Response shape rule:** every list-returning endpoint returns
 `{"data": [...], "start": int, "limit": int, "has_more": bool}` — no exceptions.
+`employee_list` is a list-returning endpoint and **must** follow this shape even
+when `q` is empty (browsing all 30,000 employees) — the "no unbounded result set"
+rule in §7 applies to it exactly as it does to any other list endpoint.
 
 **Rule:** every endpoint must validate `employee_id` exists before querying further
 and must raise `frappe.DoesNotExistError` (not a silent empty response) if not found.
@@ -193,8 +221,8 @@ and must raise `frappe.DoesNotExistError` (not a silent empty response) if not f
 
 | Cache key pattern | TTL | Invalidated by |
 |---|---|---|
-| `cache:search:{query_hash}` | 90s | time-based only (search results tolerate slight staleness) |
-| `cache:emp_summary:{employee_id}` | until next aggregation run | nightly job explicitly deletes/reset on recompute |
+| `cache:employee_list:{query_hash}` | 90s | time-based only (list/search results tolerate slight staleness); `query_hash` includes `q`, `manager`, `sort`, `start`, `limit` so different pages/filters cache separately |
+| `cache:employee_detail:{employee_id}` | until next aggregation run | nightly job explicitly deletes/resets on recompute |
 | `cache:org_dashboard` | until next aggregation run | nightly job explicitly deletes/resets on recompute |
 
 - Use Frappe's built-in `frappe.cache()` (Redis-backed) — do not introduce a separate
@@ -217,10 +245,14 @@ and must raise `frappe.DoesNotExistError` (not a silent empty response) if not f
   Query Builder `.limit()/.offset()`) on every call that can return more than one
   page. No endpoint may return an unbounded result set. This is non-negotiable given
   the 11M+ row `Employee Activity Log` table.
-- **Reads from aggregate tables, not raw logs, for anything "average"** — `employee_summary`,
-  `org_dashboard`, and similar must never compute an average by scanning
-  `Employee Activity Log` directly. That's what `Employee Monthly Stats` /
-  `Employee Overall Stats` / `Org Daily Stats` exist for.
+- **Reads from aggregate tables, not raw logs, for anything "average"** —
+  `employee_list` (its avg hours/day column), `employee_detail`, `org_dashboard`,
+  and similar must never compute an average by scanning `Employee Activity Log`
+  directly. That's what `Employee Monthly Stats` / `Employee Overall Stats` /
+  `Org Daily Stats` exist for. This applies with extra force to `employee_list`
+  specifically — it can render up to a page-size of rows per request, each with its
+  own avg-hours column, so per-row raw aggregation would multiply the cost by the
+  page size.
 - **All repository functions must be named for what they return**, e.g.
   `get_employee_logs_page(employee_id, from_date, to_date, start, limit)`, not
   generic names like `fetch_data`.
@@ -267,7 +299,7 @@ Location: `analytics_portal/constants/`.
 | File | Contains |
 |---|---|
 | `api_constants.py` | `PAGE_SIZE_DEFAULT`, `PAGE_SIZE_MAX`, endpoint name strings if referenced elsewhere |
-| `cache_keys.py` | key-format functions, e.g. `def search_key(query: str) -> str`, `def emp_summary_key(employee_id: str) -> str` |
+| `cache_keys.py` | key-format functions, e.g. `def employee_list_key(q, manager, sort, start, limit) -> str`, `def employee_detail_key(employee_id: str) -> str` |
 | `string_constants.py` | user-facing labels/messages (error text, etc.) |
 | `error_codes.py` | named error codes/messages raised by services (e.g. `EMPLOYEE_NOT_FOUND`) |
 
@@ -290,7 +322,7 @@ analytics_portal/
 │   │   └── org_daily_stats/
 │   ├── api/
 │   │   └── v1/
-│   │       ├── employee.py        # employee_search, employee_summary, employee_detail
+│   │       ├── employee.py        # employee_list, employee_detail
 │   │       ├── logs.py            # employee_logs
 │   │       └── org.py             # org_dashboard, org_hierarchy
 │   ├── services/
@@ -340,6 +372,11 @@ analytics_portal/
 - ❌ A new DocType field, endpoint, or constant added to code but not to this document
 - ❌ Silent scheduled jobs with no logging
 - ❌ Introducing a new cache/queue/DB technology not listed in §2 without flagging it
+- ❌ **Designing any endpoint around the assumption that a name/ID search returns
+  exactly one employee.** At 30,000 employees, common names return many matches —
+  `employee_list` must always be treated as a paginated list endpoint, never
+  special-cased to "return the single best match." (This was an earlier mistake in
+  this project — see the correction note at the top of §5.)
 
 ---
 
