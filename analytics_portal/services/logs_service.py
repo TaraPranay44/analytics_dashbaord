@@ -5,6 +5,10 @@ Plain Python, no `frappe.whitelist()` here. See docs/04_BACKEND_RULES.md §1.
 
 from typing import Any
 
+from analytics_portal.repositories import activity_log_repo
+from analytics_portal.utils.date_utils import resolve_date_range
+from analytics_portal.utils.validators import assert_employee_exists
+
 
 def get_employee_logs_page(
 	employee_id: str,
@@ -28,4 +32,15 @@ def get_employee_logs_page(
 	Returns:
 	    `{"data": [...], "start": start, "limit": limit, "has_more": bool}`.
 	"""
-	raise NotImplementedError
+	assert_employee_exists(employee_id)
+	resolved_from, resolved_to = resolve_date_range(from_date, to_date)
+
+	rows = activity_log_repo.get_employee_logs_page(employee_id, resolved_from, resolved_to, start, limit)
+	total = activity_log_repo.count_employee_logs(employee_id, resolved_from, resolved_to)
+
+	return {
+		"data": rows,
+		"start": start,
+		"limit": limit,
+		"has_more": start + len(rows) < total,
+	}

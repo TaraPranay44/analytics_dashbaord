@@ -19,4 +19,5 @@ def paginate(query: Any, start: int, limit: int) -> Any:
 	Returns:
 	    The same query object with limit/offset applied.
 	"""
-	raise NotImplementedError
+	capped_limit = min(limit, PAGE_SIZE_MAX)
+	return query.limit(capped_limit).offset(start)

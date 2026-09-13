@@ -1,11 +1,13 @@
 """Wrapper around `frappe.cache()` implementing a get-or-set pattern.
 
-See docs/04_BACKEND_RULES.md §6/§9 — every cache read must have a deliberate
+See docs/04_BACKEND_RULES.md §6/§9 - every cache read must have a deliberate
 invalidation path (TTL or event-based), stated at the call site.
 """
 
 from collections.abc import Callable
 from typing import Any
+
+import frappe
 
 
 def get_or_set(key: str, ttl: int | None, compute_fn: Callable[[], Any]) -> Any:
@@ -20,4 +22,10 @@ def get_or_set(key: str, ttl: int | None, compute_fn: Callable[[], Any]) -> Any:
 	Returns:
 	    The cached or freshly computed value.
 	"""
-	raise NotImplementedError
+	cached_value = frappe.cache().get_value(key)
+	if cached_value is not None:
+		return cached_value
+
+	value = compute_fn()
+	frappe.cache().set_value(key, value, expires_in_sec=ttl)
+	return value
