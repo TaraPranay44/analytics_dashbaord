@@ -7,6 +7,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
+from analytics_portal.constants.cache_keys import employee_detail_key
 from analytics_portal.jobs.recompute_overall_stats import (
 	_recompute_employee_overall,
 	enqueue_recompute_overall_stats,
@@ -87,6 +88,17 @@ class TestRecomputeOverallStats(IntegrationTestCase):
 
 		stats = stats_repo.get_employee_overall_stats(employee_id)
 		self.assertAlmostEqual(stats.avg_hours_overall, 6.0, places=1)
+
+	def test_recompute_clears_the_stale_employee_detail_cache(self) -> None:
+		employee_id = self._make_employee()
+		self._make_monthly_stats(employee_id, "2026-06", avg_hours=5.0, days_present=5)
+
+		cache_key = employee_detail_key(employee_id)
+		frappe.cache().set_value(cache_key, {"stale": "data"})
+
+		_recompute_employee_overall(employee_id)
+
+		self.assertIsNone(frappe.cache().get_value(cache_key))
 
 	def test_enqueue_pushes_the_real_job_onto_the_long_queue(self) -> None:
 		with patch("frappe.enqueue") as mock_enqueue:

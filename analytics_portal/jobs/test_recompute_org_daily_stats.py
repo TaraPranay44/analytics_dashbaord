@@ -7,6 +7,7 @@ from unittest.mock import patch
 import frappe
 from frappe.tests import IntegrationTestCase
 
+from analytics_portal.constants.cache_keys import org_dashboard_key
 from analytics_portal.jobs.recompute_org_daily_stats import (
 	_recompute_org_daily_stats_for_date,
 	enqueue_recompute_org_daily_stats,
@@ -81,6 +82,17 @@ class TestRecomputeOrgDailyStats(IntegrationTestCase):
 		self.assertIsNotNone(stats)
 		self.assertEqual(stats.total_employees, 0)
 		self.assertEqual(stats.avg_hours_org, 0.0)
+
+	def test_recompute_clears_the_stale_org_dashboard_cache(self) -> None:
+		employee_id = self._make_employee()
+		clear_cache_date = date(2099, 9, 1)
+		self._make_log(employee_id, clear_cache_date, login_hour=9, hours_worked=8)
+
+		frappe.cache().set_value(org_dashboard_key(), {"stale": "data"})
+
+		_recompute_org_daily_stats_for_date(clear_cache_date)
+
+		self.assertIsNone(frappe.cache().get_value(org_dashboard_key()))
 
 	def test_enqueue_pushes_the_real_job_onto_the_long_queue(self) -> None:
 		with patch("frappe.enqueue") as mock_enqueue:
