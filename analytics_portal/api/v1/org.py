@@ -1,6 +1,6 @@
 """Whitelisted API endpoints: org_dashboard, org_hierarchy.
 
-Thin layer only — parse/validate params, call the service, shape the response.
+Thin layer only - parse/validate params, call the service, shape the response.
 No business logic here. See docs/04_BACKEND_RULES.md §1/§5.
 """
 
@@ -16,7 +16,7 @@ def org_dashboard() -> dict:
 	Returns:
 	    Dashboard tile fields sourced from `Org Daily Stats`.
 	"""
-	raise NotImplementedError
+	return org_service.get_org_dashboard()
 
 
 @frappe.whitelist()
@@ -29,4 +29,4 @@ def org_hierarchy(employee_id: str) -> dict:
 	Returns:
 	    `{"manager_chain": [...], "direct_reports": [...]}`.
 	"""
-	raise NotImplementedError
+	return org_service.get_org_hierarchy(employee_id)

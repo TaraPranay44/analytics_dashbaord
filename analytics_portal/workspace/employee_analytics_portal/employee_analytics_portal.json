@@ -1,0 +1,113 @@
+{
+ "app": "analytics_portal",
+ "charts": [],
+ "content": "[{\"id\":\"epa-sc-employee\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Employee\",\"col\":4}},{\"id\":\"epa-sc-activity-log\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Employee Activity Log\",\"col\":4}},{\"id\":\"epa-sc-monthly-stats\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Employee Monthly Stats\",\"col\":4}},{\"id\":\"epa-sc-overall-stats\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Employee Overall Stats\",\"col\":4}},{\"id\":\"epa-sc-org-daily-stats\",\"type\":\"shortcut\",\"data\":{\"shortcut_name\":\"Org Daily Stats\",\"col\":4}},{\"id\":\"epa-spacer-1\",\"type\":\"spacer\",\"data\":{\"col\":12}},{\"id\":\"epa-card-jobs\",\"type\":\"card\",\"data\":{\"card_name\":\"Jobs & Logs\",\"col\":4}}]",
+ "creation": "2026-09-13 00:00:00.000000",
+ "custom_blocks": [],
+ "docstatus": 0,
+ "doctype": "Workspace",
+ "for_user": "",
+ "hide_custom": 0,
+ "icon": "graph",
+ "idx": 0,
+ "is_hidden": 0,
+ "label": "Employee Analytics Portal",
+ "links": [
+  {
+   "description": "Nightly aggregation jobs and background job/error monitoring",
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Jobs & Logs",
+   "link_count": 3,
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Card Break"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Scheduled Job Log",
+   "link_count": 0,
+   "link_to": "Scheduled Job Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Background Jobs",
+   "link_count": 0,
+   "link_to": "RQ Job",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  },
+  {
+   "hidden": 0,
+   "is_query_report": 0,
+   "label": "Error Log",
+   "link_count": 0,
+   "link_to": "Error Log",
+   "link_type": "DocType",
+   "onboard": 0,
+   "type": "Link"
+  }
+ ],
+ "modified": "2026-09-13 00:00:00.000000",
+ "modified_by": "Administrator",
+ "module": "Employee Analytics Portal",
+ "name": "Employee Analytics Portal",
+ "number_cards": [],
+ "owner": "Administrator",
+ "parent_page": "",
+ "public": 1,
+ "quick_lists": [],
+ "restrict_to_domain": "",
+ "roles": [],
+ "sequence_id": 1.0,
+ "shortcuts": [
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Employee",
+   "link_to": "Employee",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Employee Activity Log",
+   "link_to": "Employee Activity Log",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Employee Monthly Stats",
+   "link_to": "Employee Monthly Stats",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Employee Overall Stats",
+   "link_to": "Employee Overall Stats",
+   "stats_filter": "[]",
+   "type": "DocType"
+  },
+  {
+   "color": "Grey",
+   "doc_view": "List",
+   "label": "Org Daily Stats",
+   "link_to": "Org Daily Stats",
+   "stats_filter": "[]",
+   "type": "DocType"
+  }
+ ],
+ "title": "Employee Analytics Portal",
+ "type": "Workspace"
+}

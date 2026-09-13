@@ -1,12 +1,12 @@
 """Whitelisted API endpoint: employee_logs.
 
-Thin layer only — parse/validate params, call the service, shape the response.
+Thin layer only - parse/validate params, call the service, shape the response.
 No business logic here. See docs/04_BACKEND_RULES.md §1/§5.
 """
 
 import frappe
 
-from analytics_portal.constants.api_constants import PAGE_SIZE_DEFAULT
+from analytics_portal.constants.api_constants import PAGE_SIZE_DEFAULT, PAGE_SIZE_MAX
 from analytics_portal.services import logs_service
 
 
@@ -30,4 +30,5 @@ def employee_logs(
 	Returns:
 	    `{"data": [...], "start": int, "limit": int, "has_more": bool}`.
 	"""
-	raise NotImplementedError
+	capped_limit = min(int(limit), PAGE_SIZE_MAX)
+	return logs_service.get_employee_logs_page(employee_id, from_date, to_date, int(start), capped_limit)
