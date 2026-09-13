@@ -298,7 +298,7 @@ Location: `analytics_portal/constants/`.
 
 | File | Contains |
 |---|---|
-| `api_constants.py` | `PAGE_SIZE_DEFAULT`, `PAGE_SIZE_MAX`, endpoint name strings if referenced elsewhere |
+| `api_constants.py` | `PAGE_SIZE_DEFAULT`, `PAGE_SIZE_MAX`, endpoint name strings if referenced elsewhere, plus shared numeric config such as `EMPLOYEE_LIST_CACHE_TTL_SECONDS` (§6's 90s TTL) and `EMPLOYEE_DETAIL_TREND_DAYS` (§5's 30-day trend window) |
 | `cache_keys.py` | key-format functions, e.g. `def employee_list_key(q, manager, sort, start, limit) -> str`, `def employee_detail_key(employee_id: str) -> str` |
 | `string_constants.py` | user-facing labels/messages (error text, etc.) |
 | `error_codes.py` | named error codes/messages raised by services (e.g. `EMPLOYEE_NOT_FOUND`) |

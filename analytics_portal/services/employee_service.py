@@ -13,19 +13,20 @@ one specific employee is opened.
 
 from typing import Any
 
+from analytics_portal.constants.api_constants import (
+	EMPLOYEE_DETAIL_TREND_DAYS,
+	EMPLOYEE_LIST_CACHE_TTL_SECONDS,
+)
 from analytics_portal.constants.cache_keys import employee_detail_key, employee_list_key
 from analytics_portal.repositories import activity_log_repo, employee_repo, stats_repo
 from analytics_portal.utils.cache_utils import get_or_set
 from analytics_portal.utils.validators import assert_employee_exists
 
-_EMPLOYEE_LIST_CACHE_TTL_SECONDS = 90
-_TREND_SERIES_DAYS = 30
-
 
 def list_employees(q: str, manager: str | None, sort: str | None, start: int, limit: int) -> dict[str, Any]:
 	"""Paginated, filterable employee directory - powers the landing page.
 
-	Cached for `_EMPLOYEE_LIST_CACHE_TTL_SECONDS`, per docs/04_BACKEND_RULES.md §6.
+	Cached for `EMPLOYEE_LIST_CACHE_TTL_SECONDS`, per docs/04_BACKEND_RULES.md §6.
 
 	Args:
 	    q: name/ID search fragment; empty string means browse-all.
@@ -49,7 +50,7 @@ def list_employees(q: str, manager: str | None, sort: str | None, start: int, li
 			"has_more": start + len(rows) < total,
 		}
 
-	return get_or_set(cache_key, _EMPLOYEE_LIST_CACHE_TTL_SECONDS, _compute)
+	return get_or_set(cache_key, EMPLOYEE_LIST_CACHE_TTL_SECONDS, _compute)
 
 
 def get_employee_detail(employee_id: str) -> dict[str, Any]:
@@ -67,7 +68,7 @@ def get_employee_detail(employee_id: str) -> dict[str, Any]:
 	    Employee identity fields, the ordered manager chain, summary metrics
 	    (`avg_hours_overall`, `avg_login_time_overall`, `avg_logout_time_overall`),
 	    and a `trend` series of `{"date", "total_hours"}` for the last
-	    `_TREND_SERIES_DAYS` days.
+	    `EMPLOYEE_DETAIL_TREND_DAYS` days.
 	"""
 	assert_employee_exists(employee_id)
 	cache_key = employee_detail_key(employee_id)
@@ -76,7 +77,7 @@ def get_employee_detail(employee_id: str) -> dict[str, Any]:
 		employee = employee_repo.get_employee_by_id(employee_id)
 		manager_chain = employee_repo.get_manager_chain(employee_id)
 		overall_stats = stats_repo.get_employee_overall_stats(employee_id)
-		trend = activity_log_repo.get_recent_daily_hours(employee_id, _TREND_SERIES_DAYS)
+		trend = activity_log_repo.get_recent_daily_hours(employee_id, EMPLOYEE_DETAIL_TREND_DAYS)
 
 		return {
 			"employee_id": employee.employee_id,
