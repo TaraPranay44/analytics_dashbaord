@@ -10,6 +10,7 @@ from datetime import time
 
 import frappe
 
+from analytics_portal.constants.cache_keys import employee_detail_key
 from analytics_portal.repositories import stats_repo
 from analytics_portal.utils.time_avg import weighted_average, weighted_average_time_of_day
 
@@ -83,3 +84,6 @@ def _recompute_employee_overall(employee_id: str) -> None:
 		avg_login_time_overall=avg_login_time_overall or time(0, 0, 0),
 		avg_logout_time_overall=avg_logout_time_overall or time(0, 0, 0),
 	)
+	# employee_detail is cached with no TTL (docs/04_BACKEND_RULES.md §6) - this
+	# is the one place that ever invalidates it for this employee.
+	frappe.cache().delete_value(employee_detail_key(employee_id))

@@ -11,6 +11,7 @@ from datetime import date, time
 import frappe
 from frappe.utils import add_days, get_datetime, getdate, nowdate
 
+from analytics_portal.constants.cache_keys import org_dashboard_key
 from analytics_portal.repositories import activity_log_repo, stats_repo
 from analytics_portal.utils.time_avg import average_time_of_day
 
@@ -63,6 +64,10 @@ def _recompute_org_daily_stats_for_date(target_date: date) -> None:
 			avg_hours_org=avg_hours_org,
 			avg_login_time_org=avg_login_time_org or time(0, 0, 0),
 		)
+		# org_dashboard always reads the most-recent row and is cached with no
+		# TTL (docs/04_BACKEND_RULES.md §6) - this is the one place that ever
+		# invalidates it.
+		frappe.cache().delete_value(org_dashboard_key())
 	except Exception:
 		duration_seconds = time_module.monotonic() - started_at
 		logger.error(

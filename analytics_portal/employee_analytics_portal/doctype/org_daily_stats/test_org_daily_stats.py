@@ -1,9 +1,14 @@
 # Copyright (c) 2026, EMPLOYEE ANALYTICS PORTAL and Contributors
 # See license.txt
 
+from datetime import date
+
 import frappe
 from frappe.tests import IntegrationTestCase
-from frappe.utils import add_days, nowdate
+
+# Fixed, far-future dates - not `add_days(nowdate(), -N)` - so this test never
+# collides with a real `Org Daily Stats` row once `jobs/recompute_org_daily_stats.py`
+# (Part 3) has actually run against real/seeded data for "yesterday".
 
 
 class TestOrgDailyStats(IntegrationTestCase):
@@ -14,7 +19,7 @@ class TestOrgDailyStats(IntegrationTestCase):
 		stats = frappe.get_doc(
 			{
 				"doctype": "Org Daily Stats",
-				"date": add_days(nowdate(), -1),
+				"date": date(2099, 1, 1),
 				"total_employees": 30000,
 				"avg_hours_org": 7.4,
 				"avg_login_time_org": "09:02:00",
@@ -23,7 +28,7 @@ class TestOrgDailyStats(IntegrationTestCase):
 		self.assertEqual(stats.total_employees, 30000)
 
 	def test_date_must_be_unique(self) -> None:
-		target_date = add_days(nowdate(), -2)
+		target_date = date(2099, 1, 2)
 		frappe.get_doc(
 			{
 				"doctype": "Org Daily Stats",
