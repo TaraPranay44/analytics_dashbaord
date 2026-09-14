@@ -8,17 +8,11 @@ const props = defineProps<{ detail: EmployeeDetail }>();
 
 const insights = computed(() => computeTrendInsights(props.detail.trend));
 
-function formatDelta(value: number, unit: "%" | "pts"): string {
+function formatDelta(value: number): string {
   const rounded = Math.round(Math.abs(value));
   const arrow = value >= 0 ? "↑" : "↓";
-  return unit === "%" ? `${arrow} ${rounded}%` : `${arrow} ${rounded} pts`;
+  return `${arrow} ${rounded}%`;
 }
-
-const attendanceTrendWord = computed(() => {
-  const change = insights.value.attendanceChangePoints;
-  if (change === null || Math.abs(change) < 3) return "steady";
-  return change > 0 ? "improving" : "slipping";
-});
 
 const insightSentence = computed(() => {
   const hoursClause = `Averaging ${formatHours(props.detail.avg_hours_overall)}/day`;
@@ -28,11 +22,7 @@ const insightSentence = computed(() => {
           Math.abs(insights.value.hoursChangePercent),
         )}% over the last 7 days`
       : "";
-  const attendanceClause =
-    insights.value.attendanceRatePercent !== null
-      ? ` — attendance is ${attendanceTrendWord.value} at ${Math.round(insights.value.attendanceRatePercent)}%`
-      : "";
-  return `${hoursClause}${trendClause}${attendanceClause}.`;
+  return `${hoursClause}${trendClause}.`;
 });
 </script>
 
@@ -52,7 +42,7 @@ const insightSentence = computed(() => {
             :class="insights.hoursChangePercent >= 0 ? 'delta-up' : 'delta-down'"
             title="vs. the previous 7 days"
           >
-            {{ formatDelta(insights.hoursChangePercent, "%") }}
+            {{ formatDelta(insights.hoursChangePercent) }}
           </span>
         </div>
         <div class="metric-label">Avg. time spent / day</div>
@@ -68,22 +58,6 @@ const insightSentence = computed(() => {
         <div class="metric-bar" style="background: var(--ink-900)"></div>
         <div class="metric-value">{{ formatTimeOfDay(detail.avg_logout_time_overall) }}</div>
         <div class="metric-label">Avg. logout time</div>
-      </div>
-
-      <div v-if="insights.attendanceRatePercent !== null" class="metric-tile">
-        <div class="metric-bar" style="background: var(--teal-500)"></div>
-        <div class="metric-tile-top">
-          <div class="metric-value">{{ Math.round(insights.attendanceRatePercent) }}%</div>
-          <span
-            v-if="insights.attendanceChangePoints !== null"
-            class="metric-delta"
-            :class="insights.attendanceChangePoints >= 0 ? 'delta-up' : 'delta-down'"
-            title="vs. the previous 7 days"
-          >
-            {{ formatDelta(insights.attendanceChangePoints, "pts") }}
-          </span>
-        </div>
-        <div class="metric-label">Attendance ({{ insights.attendanceWindowDays }}d)</div>
       </div>
     </div>
 

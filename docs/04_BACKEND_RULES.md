@@ -200,7 +200,7 @@ where they return a list.
 
 | Endpoint (method name) | Purpose | Required params | Optional params |
 |---|---|---|---|
-| `employee_list` | Paginated, filterable employee directory — powers the landing page. Returns **compact rows only** (name, ID, manager, avg hours/day, avg login, status) — no charts, no multi-metric detail. | — | `q` (name/ID search, empty = browse all), `manager` (filter), `sort`, `start`, `limit` (default `PAGE_SIZE_DEFAULT`, max `PAGE_SIZE_MAX`) |
+| `employee_list` | Paginated, filterable employee directory — powers the landing page. Returns **compact rows only** (name, ID, manager, avg hours/day, avg login) — no charts, no multi-metric detail. | — | `q` (name/ID search, empty = browse all), `manager` (filter), `sort`, `start`, `limit` (default `PAGE_SIZE_DEFAULT`, max `PAGE_SIZE_MAX`) |
 | `employee_detail` | Full detail for ONE employee: identity, manager chain, DOJ, summary metrics (avg hours/day, avg login, avg logout — all lifetime, from `Employee Overall Stats`), and a daily-hours trend series (last `EMPLOYEE_DETAIL_TREND_DAYS` days, from raw logs) for the detail-page chart | `employee_id` | — |
 | `employee_logs` | Paginated day-by-day activity log for one employee | `employee_id` | `from_date`, `to_date`, `start`, `limit` |
 | `employee_monthly_trend` | Lifetime monthly avg-hours trend for one employee (detail page "Lifetime" chart view), from `Employee Monthly Stats`. **Not paginated** — naturally bounded by tenure (months), same reasoning as `direct_reports` below. | `employee_id` | — |

@@ -131,8 +131,9 @@ what's listed here without flagging it as a deviation.
 ## 5. Data-fetching, caching & pagination rules
 
 - Activity log lists use **paginated fetch** matching the backend's `start`/`limit`
-  contract (`04_BACKEND_RULES.md §5`) — infinite-scroll pattern in the View, driven
-  by an `AsyncNotifier` that appends pages, never "fetch everything then paginate
+  contract (`04_BACKEND_RULES.md §5`) — a discrete Prev/Next pager in the View
+  (`PaginationBar`, mirroring `web/src/components/Pagination.vue`), one page
+  fetched per request via the ViewModel, never "fetch everything then paginate
   client-side."
 - Isar is used as a **read-through cache**: last-fetched summary/logs are cached
   locally so the app shows something on poor connectivity, then refreshes once the

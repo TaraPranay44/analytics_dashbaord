@@ -149,7 +149,7 @@ src/
 │   ├── ManagerFilterCombobox.vue   # typeahead over `employee_list` (q=text, small limit) — picks a manager by name, stores their employee_id; never loads "all managers" at once
 │   ├── EmployeeListTable.vue       # paginated, compact rows — NO charts, NO multi-metric summary
 │   ├── OrgStatTile.vue             # dashboard stat tile: label/value/delta badge/optional sparkline (org_dashboard/org_insights)
-│   ├── EmployeeListRow.vue         # single row: avatar, name/ID, manager, avg hrs/day, avg login, status
+│   ├── EmployeeListRow.vue         # single row: avatar, name/ID, manager, avg hrs/day, avg login
 │   ├── Pagination.vue              # "Showing X–Y of Z" + Prev/Next, used by EmployeeListTable
 │   ├── EmployeeSummaryPanel.vue    # rich metrics block — EmployeeDetailView ONLY, never the landing list
 │   ├── EmployeeTrendChart.vue      # the per-employee chart — EmployeeDetailView ONLY
