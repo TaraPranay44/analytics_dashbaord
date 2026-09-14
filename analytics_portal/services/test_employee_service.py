@@ -65,3 +65,32 @@ class TestEmployeeService(IntegrationTestCase):
 	def test_get_employee_detail_raises_for_unknown_employee(self) -> None:
 		with self.assertRaises(frappe.DoesNotExistError):
 			employee_service.get_employee_detail(f"{_MARKER}-NOT-REAL")
+
+	def test_get_employee_monthly_trend_returns_months_oldest_first(self) -> None:
+		frappe.get_doc(
+			{
+				"doctype": "Employee Monthly Stats",
+				"employee": self.employee.name,
+				"year_month": "2026-03",
+				"avg_hours": 8.0,
+				"days_present": 20,
+			}
+		).insert()
+		frappe.get_doc(
+			{
+				"doctype": "Employee Monthly Stats",
+				"employee": self.employee.name,
+				"year_month": "2026-01",
+				"avg_hours": 6.5,
+				"days_present": 18,
+			}
+		).insert()
+
+		trend = employee_service.get_employee_monthly_trend(self.employee.name)
+
+		self.assertEqual([row["year_month"] for row in trend], ["2026-01", "2026-03"])
+		self.assertAlmostEqual(trend[0]["avg_hours"], 6.5, places=1)
+
+	def test_get_employee_monthly_trend_raises_for_unknown_employee(self) -> None:
+		with self.assertRaises(frappe.DoesNotExistError):
+			employee_service.get_employee_monthly_trend(f"{_MARKER}-NOT-REAL")

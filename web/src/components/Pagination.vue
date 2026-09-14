@@ -1,59 +1,31 @@
 <script setup lang="ts">
 defineProps<{
-  page: number
-  pageSize: number
-  hasMore: boolean
-}>()
+  start: number;
+  limit: number;
+  rowCount: number;
+  hasMore: boolean;
+  loading?: boolean;
+}>();
 
 const emit = defineEmits<{
-  'update:page': [value: number]
-}>()
-
-function goPrev(page: number) {
-  if (page > 1) {
-    emit('update:page', page - 1)
-  }
-}
-
-function goNext(page: number, hasMore: boolean) {
-  if (hasMore) {
-    emit('update:page', page + 1)
-  }
-}
+  prev: [];
+  next: [];
+}>();
 </script>
 
 <template>
-  <div class="pagination">
-    <span>
-      Showing {{ (page - 1) * pageSize + 1 }}–{{ (page - 1) * pageSize + pageSize }}
+  <div class="pager-row">
+    <span v-if="rowCount > 0">
+      Showing {{ start + 1 }}–{{ start + rowCount }}{{ hasMore ? " · more available" : "" }}
     </span>
-    <div class="pagination-controls">
-      <button :disabled="page <= 1" @click="goPrev(page)">Prev</button>
-      <button :disabled="!hasMore" @click="goNext(page, hasMore)">Next</button>
+    <span v-else>No rows to show</span>
+    <div class="pager-controls">
+      <button class="page-btn page-btn-arrow" type="button" :disabled="start <= 0 || loading" @click="emit('prev')">
+        <span class="page-btn-arrow-icon">←</span> Prev
+      </button>
+      <button class="page-btn page-btn-arrow" type="button" :disabled="!hasMore || loading" @click="emit('next')">
+        Next <span class="page-btn-arrow-icon">→</span>
+      </button>
     </div>
   </div>
 </template>
-
-<style scoped>
-.pagination {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0.75rem 0;
-  font-size: 0.9rem;
-}
-.pagination-controls {
-  display: flex;
-  gap: 0.5rem;
-}
-button {
-  padding: 0.4rem 0.9rem;
-  border-radius: 6px;
-  border: 1px solid #444;
-  cursor: pointer;
-}
-button:disabled {
-  opacity: 0.4;
-  cursor: not-allowed;
-}
-</style>

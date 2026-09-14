@@ -1,15 +1,11 @@
-export function debounce<T extends (...args: any[]) => void>(
-  fn: T,
-  delayMs: number
-): (...args: Parameters<T>) => void {
-  let timeoutId: ReturnType<typeof setTimeout> | undefined
-
-  return (...args: Parameters<T>) => {
-    if (timeoutId) {
-      clearTimeout(timeoutId)
-    }
-    timeoutId = setTimeout(() => {
-      fn(...args)
-    }, delayMs)
-  }
+/** Trailing-edge debounce - used for search-as-you-type (docs/05_FRONTEND_WEB_RULES.md §5). */
+export function debounce<Args extends unknown[]>(
+  fn: (...args: Args) => void,
+  waitMs: number,
+): (...args: Args) => void {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  return (...args: Args) => {
+    if (timer !== undefined) clearTimeout(timer);
+    timer = setTimeout(() => fn(...args), waitMs);
+  };
 }

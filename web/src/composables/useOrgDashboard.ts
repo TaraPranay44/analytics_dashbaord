@@ -1,16 +1,18 @@
-import { useQuery } from '@tanstack/vue-query'
-import { fetchOrgDashboard } from '../api/orgApi'
+import { computed } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { fetchOrgDashboard } from "@/api/orgApi";
 
+/** ViewModel for the org-wide dashboard tiles (`org_dashboard`). */
 export function useOrgDashboard() {
   const query = useQuery({
-    queryKey: ['org', 'dashboard'],
+    queryKey: ["org", "dashboard"] as const,
     queryFn: fetchOrgDashboard,
-  })
+  });
 
   return {
-    orgDashboard: query.data,
-    isLoading: query.isLoading,
+    dashboard: computed(() => query.data.value ?? null),
+    isLoading: query.isPending,
     isError: query.isError,
     error: query.error,
-  }
+  };
 }

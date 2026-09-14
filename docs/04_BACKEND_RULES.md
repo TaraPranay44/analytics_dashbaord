@@ -200,10 +200,12 @@ where they return a list.
 
 | Endpoint (method name) | Purpose | Required params | Optional params |
 |---|---|---|---|
-| `employee_list` | Paginated, filterable employee directory — powers the landing page. Returns **compact rows only** (name, ID, manager, avg hours/day, avg login, status) — no charts, no multi-metric detail. | — | `q` (name/ID search, empty = browse all), `manager` (filter), `sort`, `start`, `limit` (default `PAGE_SIZE_DEFAULT`, max `PAGE_SIZE_MAX`) |
-| `employee_detail` | Full detail for ONE employee: identity, manager chain, DOJ, summary metrics (avg/day, avg login, avg logout, attendance %), and a trend series (e.g. daily hours for the last 30 days) for the detail-page chart | `employee_id` | — |
+| `employee_list` | Paginated, filterable employee directory — powers the landing page. Returns **compact rows only** (name, ID, manager, avg hours/day, avg login) — no charts, no multi-metric detail. | — | `q` (name/ID search, empty = browse all), `manager` (filter), `sort`, `start`, `limit` (default `PAGE_SIZE_DEFAULT`, max `PAGE_SIZE_MAX`) |
+| `employee_detail` | Full detail for ONE employee: identity, manager chain, DOJ, summary metrics (avg hours/day, avg login, avg logout — all lifetime, from `Employee Overall Stats`), and a daily-hours trend series (last `EMPLOYEE_DETAIL_TREND_DAYS` days, from raw logs) for the detail-page chart | `employee_id` | — |
 | `employee_logs` | Paginated day-by-day activity log for one employee | `employee_id` | `from_date`, `to_date`, `start`, `limit` |
-| `org_dashboard` | Org-wide tiles for landing page header | — | — |
+| `employee_monthly_trend` | Lifetime monthly avg-hours trend for one employee (detail page "Lifetime" chart view), from `Employee Monthly Stats`. **Not paginated** — naturally bounded by tenure (months), same reasoning as `direct_reports` below. | `employee_id` | — |
+| `org_dashboard` | Org-wide tiles for landing page header, plus a trailing `ORG_DASHBOARD_HISTORY_DAYS`-day `history` of `Org Daily Stats` (hours/login-time sparklines) and a trailing `HEADCOUNT_TREND_MONTHS`-month `headcount_trend` of registered-headcount snapshots (headcount sparkline — daily granularity isn't meaningful for headcount at this org's size) | — | — |
+| `org_insights` | Supplementary dashboard insight-chip data: `manager_count`, `total_registered_employees` + `total_registered_employees_growth_window_start` + `headcount_growth_window_days` (real headcount-growth %), `low_hours_threshold` + `low_hours_employee_count`, `recent_hires_count` + `recent_hires_window_days`. Not cached (cheap count queries) — see §6. | — | — |
 | `org_hierarchy` | Manager chain / direct reports | `employee_id` | — |
 
 **Response shape rule:** every list-returning endpoint returns
@@ -214,6 +216,16 @@ rule in §7 applies to it exactly as it does to any other list endpoint.
 
 **Rule:** every endpoint must validate `employee_id` exists before querying further
 and must raise `frappe.DoesNotExistError` (not a silent empty response) if not found.
+
+**Narrow exception to "every list must be paginated" (§3):** `org_hierarchy`'s
+`direct_reports`, `employee_monthly_trend`, and `org_dashboard`'s embedded
+`history` and `headcount_trend` arrays are all naturally bounded — by org-chart
+fan-out, by tenure in months, or by a fixed `ORG_DASHBOARD_HISTORY_DAYS`-day /
+`HEADCOUNT_TREND_MONTHS`-month window, respectively — realistically at most low
+hundreds of rows even in extreme cases, nothing like the 30,000-row `Employee`
+table or the 11M+-row `Employee Activity Log`. They intentionally skip the
+paginated envelope. This does **not** extend to any endpoint whose result size
+scales with total employees or total logs.
 
 ---
 
@@ -298,7 +310,7 @@ Location: `analytics_portal/constants/`.
 
 | File | Contains |
 |---|---|
-| `api_constants.py` | `PAGE_SIZE_DEFAULT`, `PAGE_SIZE_MAX`, endpoint name strings if referenced elsewhere, plus shared numeric config such as `EMPLOYEE_LIST_CACHE_TTL_SECONDS` (§6's 90s TTL) and `EMPLOYEE_DETAIL_TREND_DAYS` (§5's 30-day trend window) |
+| `api_constants.py` | `PAGE_SIZE_DEFAULT`, `PAGE_SIZE_MAX`, endpoint name strings if referenced elsewhere, plus shared numeric config such as `EMPLOYEE_LIST_CACHE_TTL_SECONDS` (§6's 90s TTL), `EMPLOYEE_DETAIL_TREND_DAYS` (§5's 30-day trend window), `ORG_DASHBOARD_HISTORY_DAYS`, `LOW_HOURS_MARGIN_HOURS`, `RECENT_HIRES_WINDOW_DAYS`, `HEADCOUNT_GROWTH_WINDOW_DAYS`, and `HEADCOUNT_TREND_MONTHS` (all `org_insights`/`org_dashboard` config) |
 | `cache_keys.py` | key-format functions, e.g. `def employee_list_key(q, manager, sort, start, limit) -> str`, `def employee_detail_key(employee_id: str) -> str` |
 | `string_constants.py` | user-facing labels/messages (error text, etc.) |
 | `error_codes.py` | named error codes/messages raised by services (e.g. `EMPLOYEE_NOT_FOUND`) |

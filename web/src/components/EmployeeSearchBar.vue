@@ -1,42 +1,39 @@
 <script setup lang="ts">
-import { ref, watch } from 'vue'
-import { debounce } from '../utils/debounce'
-import { UI_STRINGS } from '../constants/stringConstants'
+import { ref, watch } from "vue";
+import { STRINGS } from "@/constants/stringConstants";
+import { debounce } from "@/utils/debounce";
+import { SEARCH_DEBOUNCE_MS } from "@/constants/apiConstants";
 
-const props = defineProps<{
-  modelValue: string
-}>()
+const props = defineProps<{ modelValue: string }>();
+const emit = defineEmits<{ "update:modelValue": [value: string] }>();
 
-const emit = defineEmits<{
-  'update:modelValue': [value: string]
-}>()
+// Local echo so the input feels instant while the debounced emit catches up -
+// query-per-keystroke is forbidden (docs/05_FRONTEND_WEB_RULES.md §5/§8).
+const localValue = ref(props.modelValue);
+watch(
+  () => props.modelValue,
+  (value) => {
+    if (value !== localValue.value) localValue.value = value;
+  },
+);
 
-const localValue = ref(props.modelValue)
+const emitDebounced = debounce((value: string) => emit("update:modelValue", value), SEARCH_DEBOUNCE_MS);
 
-const debouncedEmit = debounce((value: string) => {
-  emit('update:modelValue', value)
-}, 300)
-
-watch(localValue, (newValue) => {
-  debouncedEmit(newValue)
-})
+function onInput(event: Event): void {
+  const value = (event.target as HTMLInputElement).value;
+  localValue.value = value;
+  emitDebounced(value);
+}
 </script>
 
 <template>
-  <input
-    type="text"
-    v-model="localValue"
-    :placeholder="UI_STRINGS.SEARCH_PLACEHOLDER"
-    class="search-bar"
-  />
+  <div class="search-bar">
+    <span class="search-icon"></span>
+    <input
+      type="text"
+      :value="localValue"
+      :placeholder="STRINGS.searchPlaceholder"
+      @input="onInput"
+    />
+  </div>
 </template>
-
-<style scoped>
-.search-bar {
-  padding: 0.5rem 1rem;
-  border-radius: 6px;
-  border: 1px solid #444;
-  width: 100%;
-  max-width: 400px;
-}
-</style>

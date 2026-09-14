@@ -1,20 +1,12 @@
-import { frappeRequest } from 'frappe-ui'
+import { call } from "frappe-ui";
 
-export async function callApi<T>(
-  method: string,
-  params: Record<string, string | number | undefined> = {}
-): Promise<T> {
-  const cleanParams: Record<string, string | number> = {}
-
-  Object.entries(params).forEach(([key, value]) => {
-    if (value !== undefined) {
-      cleanParams[key] = value
-    }
-  })
-
-  return frappeRequest({
-    url: `/api/method/${method}`,
-    method: 'GET',
-    params: cleanParams,
-  }) as Promise<T>
+/**
+ * Thin wrapper around frappe-ui's `call` - Frappe's session/CSRF handling
+ * stays inside frappe-ui (docs/05_FRONTEND_WEB_RULES.md §3: "use its
+ * session/auth handling, don't hand-roll a parallel auth client"). Every
+ * `api/*Api.ts` function goes through this - no `.vue` file calls `call`
+ * directly.
+ */
+export function apiCall<T>(method: string, params: Record<string, unknown> = {}): Promise<T> {
+  return call(method, params) as Promise<T>;
 }

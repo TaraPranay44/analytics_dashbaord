@@ -1,4 +1,4 @@
-"""Whitelisted API endpoints: org_dashboard, org_hierarchy.
+"""Whitelisted API endpoints: org_dashboard, org_insights, org_hierarchy.
 
 Thin layer only - parse/validate params, call the service, shape the response.
 No business logic here. See docs/04_BACKEND_RULES.md §1/§5.
@@ -17,6 +17,17 @@ def org_dashboard() -> dict:
 	    Dashboard tile fields sourced from `Org Daily Stats`.
 	"""
 	return org_service.get_org_dashboard()
+
+
+@frappe.whitelist()
+def org_insights() -> dict:
+	"""Supplementary real-data callouts for the dashboard's insight chips.
+
+	Returns:
+	    `manager_count`, `total_registered_employees`, `low_hours_threshold`,
+	    `low_hours_employee_count`, `recent_hires_count`, `recent_hires_window_days`.
+	"""
+	return org_service.get_org_insights()
 
 
 @frappe.whitelist()

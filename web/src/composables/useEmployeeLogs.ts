@@ -1,34 +1,52 @@
-import { computed, type Ref } from 'vue'
-import { useQuery } from '@tanstack/vue-query'
-import { fetchEmployeeLogs } from '../api/logsApi'
-import { PAGE_SIZE_DEFAULT } from '../constants/apiConstants'
+import { computed, type Ref } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { fetchEmployeeLogs } from "@/api/logsApi";
 
-export function useEmployeeLogs(
-  employeeId: Ref<string>,
-  fromDate: Ref<string>,
-  toDate: Ref<string>,
-  page: Ref<number>
-) {
-  const start = computed(() => (page.value - 1) * PAGE_SIZE_DEFAULT)
+export interface UseEmployeeLogsParams {
+  employeeId: Ref<string>;
+  fromDate: Ref<string | null>;
+  toDate: Ref<string | null>;
+  start: Ref<number>;
+  limit: Ref<number>;
+}
+
+/** ViewModel for the activity-log table (`employee_logs`). */
+export function useEmployeeLogs(params: UseEmployeeLogsParams) {
+  const queryKey = computed(
+    () =>
+      [
+        "employee",
+        params.employeeId.value,
+        "logs",
+        {
+          from: params.fromDate.value,
+          to: params.toDate.value,
+          start: params.start.value,
+          limit: params.limit.value,
+        },
+      ] as const,
+  );
 
   const query = useQuery({
-    queryKey: ['employee', employeeId, 'logs', { fromDate, toDate, start }],
+    queryKey,
     queryFn: () =>
       fetchEmployeeLogs({
-        employee_id: employeeId.value,
-        from_date: fromDate.value || undefined,
-        to_date: toDate.value || undefined,
-        start: start.value,
-        limit: PAGE_SIZE_DEFAULT,
+        employeeId: params.employeeId.value,
+        fromDate: params.fromDate.value,
+        toDate: params.toDate.value,
+        start: params.start.value,
+        limit: params.limit.value,
       }),
-    enabled: () => !!employeeId.value,
-  })
+    enabled: computed(() => Boolean(params.employeeId.value)),
+    placeholderData: (previousData) => previousData,
+  });
 
   return {
-    logs: computed(() => query.data.value?.data ?? []),
+    rows: computed(() => query.data.value?.data ?? []),
     hasMore: computed(() => query.data.value?.has_more ?? false),
-    isLoading: query.isLoading,
+    isLoading: query.isPending,
+    isFetching: query.isFetching,
     isError: query.isError,
     error: query.error,
-  }
+  };
 }

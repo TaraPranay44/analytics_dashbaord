@@ -1,13 +1,18 @@
-import { callApi } from './client'
-import { API_METHODS } from '../constants/apiConstants'
-import type { OrgDashboard, OrgHierarchyNode } from '../types/org'
+import { apiCall } from "./client";
+import { API_METHODS } from "@/constants/apiConstants";
+import type { OrgDashboard, OrgHierarchy, OrgInsights } from "@/types/employee";
 
-export async function fetchOrgDashboard(): Promise<OrgDashboard> {
-  return callApi<OrgDashboard>(API_METHODS.ORG_DASHBOARD)
+/** Calls `org_dashboard` - org-wide tiles + history for the landing dashboard header. */
+export function fetchOrgDashboard(): Promise<OrgDashboard> {
+  return apiCall<OrgDashboard>(API_METHODS.orgDashboard);
 }
 
-export async function fetchOrgHierarchy(employeeId: string): Promise<OrgHierarchyNode> {
-  return callApi<OrgHierarchyNode>(API_METHODS.ORG_HIERARCHY, {
-    employee_id: employeeId,
-  })
+/** Calls `org_insights` - supplementary real-data callouts for the dashboard's insight chips. */
+export function fetchOrgInsights(): Promise<OrgInsights> {
+  return apiCall<OrgInsights>(API_METHODS.orgInsights);
+}
+
+/** Calls `org_hierarchy` - manager chain and direct reports for one employee. */
+export function fetchOrgHierarchy(employeeId: string): Promise<OrgHierarchy> {
+  return apiCall<OrgHierarchy>(API_METHODS.orgHierarchy, { employee_id: employeeId });
 }

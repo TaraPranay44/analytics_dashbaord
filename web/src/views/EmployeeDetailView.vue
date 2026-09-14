@@ -1,126 +1,139 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
-import { useRoute } from 'vue-router'
-import { useEmployeeDetail } from '../composables/useEmployeeDetail'
-import { useEmployeeLogs } from '../composables/useEmployeeLogs'
-import { useDateRangeFilter } from '../composables/useDateRangeFilter'
-import { PAGE_SIZE_DEFAULT } from '../constants/apiConstants'
-import EmployeeSummaryPanel from '../components/EmployeeSummaryPanel.vue'
-import EmployeeTrendChart from '../components/EmployeeTrendChart.vue'
-import ActivityLogTable from '../components/ActivityLogTable.vue'
-import DateRangeFilter from '../components/DateRangeFilter.vue'
-import Pagination from '../components/Pagination.vue'
+import { computed, ref, watch } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import { useEmployeeDetail } from "@/composables/useEmployeeDetail";
+import { useEmployeeLogs } from "@/composables/useEmployeeLogs";
+import { useOrgHierarchy } from "@/composables/useOrgHierarchy";
+import { useDateRangeFilter } from "@/composables/useDateRangeFilter";
+import EmployeeSummaryPanel from "@/components/EmployeeSummaryPanel.vue";
+import EmployeeTrendChart from "@/components/EmployeeTrendChart.vue";
+import ActivityLogTable from "@/components/ActivityLogTable.vue";
+import DateRangeFilter from "@/components/DateRangeFilter.vue";
+import OrgHierarchyView from "@/components/OrgHierarchyView.vue";
+import Pagination from "@/components/Pagination.vue";
+import { PAGE_SIZE_DEFAULT } from "@/constants/apiConstants";
+import { ROUTE_PATHS } from "@/constants/routeConstants";
+import { STRINGS } from "@/constants/stringConstants";
+import { avatarGradientFor, initialsFor } from "@/utils/avatar";
 
-const route = useRoute()
+const route = useRoute();
+const router = useRouter();
+const employeeId = computed(() => String(route.params.employeeId ?? ""));
 
-const employeeId = computed(() => String(route.params.employeeId))
+const { detail, isLoading: detailLoading, isError: detailError } = useEmployeeDetail(employeeId);
+const { managerChain, directReports, isLoading: hierarchyLoading } = useOrgHierarchy(employeeId);
+const { fromDate, toDate, applyLastNDays, clear } = useDateRangeFilter();
 
-const dateRange = useDateRangeFilter()
-
-const { employee, isLoading: isDetailLoading, isError: isDetailError } =
-  useEmployeeDetail(employeeId)
-
-const logsPage = ref(1)
+const logsStart = ref(0);
+const logsLimit = ref(PAGE_SIZE_DEFAULT);
+watch(employeeId, () => {
+  logsStart.value = 0;
+});
+watch([fromDate, toDate], () => {
+  logsStart.value = 0;
+});
 
 const {
-  logs,
-  hasMore,
-  isLoading: isLogsLoading,
-} = useEmployeeLogs(employeeId, dateRange.fromDate, dateRange.toDate, logsPage)
+  rows: logRows,
+  hasMore: logsHasMore,
+  isLoading: logsLoading,
+  isFetching: logsFetching,
+} = useEmployeeLogs({
+  employeeId,
+  fromDate,
+  toDate,
+  start: logsStart,
+  limit: logsLimit,
+});
+
+function goBack(): void {
+  router.push(ROUTE_PATHS.dashboard);
+}
+function nextLogsPage(): void {
+  if (logsHasMore.value) logsStart.value += logsLimit.value;
+}
+function prevLogsPage(): void {
+  logsStart.value = Math.max(0, logsStart.value - logsLimit.value);
+}
 </script>
 
 <template>
-  <div class="employee-detail-view">
-    <button type="button" class="back-link" @click="$router.back()">
-      ← Back to employees
-    </button>
+  <div class="app-shell">
+    <nav class="sidebar">
+      <div class="sidebar-logo"><div class="logo-mark"></div><span>Analytics</span></div>
+      <button class="nav-item"><span class="dot"></span>Dashboard</button>
+    </nav>
 
-    <div v-if="isDetailLoading" class="state-message">Loading employee…</div>
-    <div v-else-if="isDetailError" class="state-message state-message--error">
-      Couldn't load this employee.
-    </div>
+    <main class="main">
+      <div class="topbar">
+        <span class="breadcrumb">Executive Dashboard</span>
+      </div>
 
-    <template v-else-if="employee">
-      <EmployeeSummaryPanel :employee="employee" />
-
-      <EmployeeTrendChart :trend="employee.trend" />
-
-      <section class="logs-section">
-        <div class="logs-section__header">
-          <h3>Activity log</h3>
-          <DateRangeFilter
-            :preset="dateRange.preset.value"
-            :custom-from="dateRange.customFrom.value"
-            :custom-to="dateRange.customTo.value"
-            @update:preset="dateRange.preset.value = $event"
-            @update:custom-from="dateRange.customFrom.value = $event"
-            @update:custom-to="dateRange.customTo.value = $event"
-          />
+      <div class="body-content">
+        <div class="detail-header">
+          <button class="back-chip" type="button" @click="goBack">←</button>
+          <div v-if="detail" class="detail-avatar" :style="{ background: avatarGradientFor(detail.employee_id) }">
+            <span class="avatar-initials">{{ initialsFor(detail.employee_name) }}</span>
+          </div>
+          <div v-if="detail">
+            <div class="detail-title-row">
+              <h1>{{ detail.employee_name }}</h1>
+              <span class="id-tag">{{ detail.employee_id }}</span>
+            </div>
+            <p v-if="detail.date_of_joining" class="detail-sub">Joined {{ detail.date_of_joining }}</p>
+          </div>
+          <div v-else-if="detailLoading">
+            <h1>{{ STRINGS.loadingLabel }}</h1>
+          </div>
         </div>
 
-        <div v-if="isLogsLoading" class="state-message">Loading logs…</div>
-        <ActivityLogTable v-else :logs="logs" />
+        <div v-if="detailError" class="card emp-table-status">{{ STRINGS.employeeNotFound }}</div>
 
-        <Pagination
-          :page="logsPage"
-          :page-size="PAGE_SIZE_DEFAULT"
-          :has-more="hasMore"
-          @update:page="logsPage = $event"
-        />
-      </section>
-    </template>
+        <template v-else>
+          <div class="detail-grid">
+            <div class="flex-col gap-md">
+              <div v-if="detail" class="card profile-id-card">
+                <div class="detail-list">
+                  <div class="row"><span class="k">Employee ID</span><span class="v">{{ detail.employee_id }}</span></div>
+                  <div v-if="detail.date_of_joining" class="row">
+                    <span class="k">Joined</span><span class="v">{{ detail.date_of_joining }}</span>
+                  </div>
+                </div>
+              </div>
+              <OrgHierarchyView
+                :manager-chain="managerChain"
+                :direct-reports="directReports"
+                :loading="hierarchyLoading"
+              />
+            </div>
+
+            <div class="flex-col gap-lg" v-if="detail">
+              <EmployeeSummaryPanel :detail="detail" />
+              <EmployeeTrendChart :trend="detail.trend" :employee-id="detail.employee_id" />
+            </div>
+            <div v-else class="card emp-table-status">{{ STRINGS.loadingLabel }}</div>
+          </div>
+
+          <div v-if="detail" class="flex-col gap-md">
+            <DateRangeFilter
+              :from-date="fromDate"
+              :to-date="toDate"
+              @apply-last-n-days="applyLastNDays"
+              @clear="clear"
+            />
+            <ActivityLogTable :rows="logRows" :loading="logsLoading" />
+            <Pagination
+              :start="logsStart"
+              :limit="logsLimit"
+              :row-count="logRows.length"
+              :has-more="logsHasMore"
+              :loading="logsFetching"
+              @prev="prevLogsPage"
+              @next="nextLogsPage"
+            />
+          </div>
+        </template>
+      </div>
+    </main>
   </div>
 </template>
-
-<style scoped>
-.employee-detail-view {
-  display: flex;
-  flex-direction: column;
-  gap: 20px;
-  padding: 20px;
-  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
-}
-
-.back-link {
-  align-self: flex-start;
-  background: none;
-  border: none;
-  color: #3b5bdb;
-  font-size: 13px;
-  cursor: pointer;
-  padding: 0;
-}
-
-.state-message {
-  padding: 24px 0;
-  text-align: center;
-  color: #6b7280;
-  font-size: 13px;
-}
-
-.state-message--error {
-  color: #c0392b;
-}
-
-.logs-section {
-  border: 1px solid #e2e5eb;
-  border-radius: 6px;
-  background: #ffffff;
-  padding: 20px 24px;
-}
-
-.logs-section__header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  margin-bottom: 16px;
-}
-
-.logs-section__header h3 {
-  margin: 0;
-  font-size: 15px;
-  font-weight: 600;
-}
-</style>

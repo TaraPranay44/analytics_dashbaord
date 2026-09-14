@@ -56,7 +56,7 @@
  ],
  "modified": "2026-09-13 00:00:00.000000",
  "modified_by": "Administrator",
- "module": "Employee Analytics Portal",
+ "module": "EMPLOYEE ANALYTICS PORTAL",
  "name": "Employee Analytics Portal",
  "number_cards": [],
  "owner": "Administrator",
@@ -64,8 +64,15 @@
  "public": 1,
  "quick_lists": [],
  "restrict_to_domain": "",
- "roles": [],
- "sequence_id": 1.0,
+ "roles": [
+  {
+   "role": "Data Admin"
+  },
+  {
+   "role": "System Manager"
+  }
+ ],
+ "sequence_id": 0.5,
  "shortcuts": [
   {
    "color": "Grey",

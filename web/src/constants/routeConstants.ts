@@ -1,15 +1,23 @@
 export const ROUTE_NAMES = {
-  LOGIN: 'login',
-  DASHBOARD: 'dashboard',
-  EMPLOYEE_DETAIL: 'employee-detail',
-  COMING_SOON: 'coming-soon',
-  ORG_HIERARCHY: 'org-hierarchy',
-} as const
+  login: "login",
+  dashboard: "dashboard",
+  employeeDetail: "employee-detail",
+  comingSoon: "coming-soon",
+} as const;
 
 export const ROUTE_PATHS = {
-  LOGIN: '/',
-  DASHBOARD: '/dashboard',
-  EMPLOYEE_DETAIL: '/employee/:employeeId',
-  COMING_SOON: '/coming-soon',
-  ORG_HIERARCHY: '/org-hierarchy/:employeeId',
-} as const
+  login: "/login",
+  dashboard: "/dashboard",
+  employeeDetail: "/employees/:employeeId",
+  comingSoon: "/coming-soon/:role",
+} as const;
+
+export function employeeDetailPath(employeeId: string): string {
+  return `/employees/${encodeURIComponent(employeeId)}`;
+}
+
+export type ComingSoonRole = "manager" | "employee";
+
+export function comingSoonPath(role: ComingSoonRole): string {
+  return `/coming-soon/${role}`;
+}

@@ -1,13 +1,15 @@
-export const UI_STRINGS = {
-  LOGIN_TITLE: 'Employee Analytics Portal',
-  LOGIN_SUBTITLE: 'Sign in to continue',
-  ROLE_CEO: 'CEO',
-  ROLE_MANAGER: 'Manager',
-  ROLE_EMPLOYEE: 'Employee',
-  COMING_SOON_TITLE: 'Coming Soon',
-  COMING_SOON_MESSAGE: 'This feature is not available yet.',
-  SEARCH_PLACEHOLDER: 'Search by name or employee ID',
-  NO_RESULTS: 'No employees found.',
-  LOADING: 'Loading...',
-  ERROR_GENERIC: 'Something went wrong. Please try again.',
-} as const
+export const STRINGS = {
+  appName: "Analytics Portal",
+  loginHeadline: "Every clock-in. Every hour. One radiant view.",
+  loginSub:
+    "Attendance, work hours, and line-management insight for every employee — built for executives who want the whole picture at a glance.",
+  demoNote: "Hardcoded sign-in for this demo environment.",
+  searchPlaceholder: "Search employee by name or ID…",
+  noResults: "No employees match these filters.",
+  noLogs: "No activity logged in this range.",
+  loadingLabel: "Loading…",
+  employeeNotFound: "This employee could not be found.",
+  comingSoonTitle: "Coming soon",
+  comingSoonBody: "This role's dashboard is on our roadmap — check back soon.",
+  backToSignIn: "Back to sign in",
+} as const;

@@ -1,27 +1,43 @@
-import { defineStore } from 'pinia'
+import { defineStore } from "pinia";
+import { PAGE_SIZE_DEFAULT } from "@/constants/apiConstants";
 
-export const useUiFilterStore = defineStore('uiFilter', {
+/**
+ * Client-only UI state for the landing employee list: current search text,
+ * manager filter, sort, and page offset. Server data itself (the rows) lives
+ * in TanStack Query's cache, never here - docs/05_FRONTEND_WEB_RULES.md §2.
+ */
+export const useUiFilterStore = defineStore("uiFilter", {
   state: () => ({
-    searchQuery: '',
-    managerFilter: '',
-    sort: '',
-    page: 1,
+    q: "",
+    manager: null as string | null,
+    sort: null as string | null,
+    start: 0,
+    limit: PAGE_SIZE_DEFAULT,
   }),
   actions: {
-    setSearchQuery(value: string) {
-      this.searchQuery = value
-      this.page = 1
+    setQuery(q: string) {
+      this.q = q;
+      this.start = 0;
     },
-    setManagerFilter(value: string) {
-      this.managerFilter = value
-      this.page = 1
+    setManager(manager: string | null) {
+      this.manager = manager;
+      this.start = 0;
     },
-    setSort(value: string) {
-      this.sort = value
-      this.page = 1
+    setSort(sort: string | null) {
+      this.sort = sort;
+      this.start = 0;
     },
-    setPage(value: number) {
-      this.page = value
+    nextPage(hasMore: boolean) {
+      if (hasMore) this.start += this.limit;
+    },
+    prevPage() {
+      this.start = Math.max(0, this.start - this.limit);
+    },
+    reset() {
+      this.q = "";
+      this.manager = null;
+      this.sort = null;
+      this.start = 0;
     },
   },
-})
+});

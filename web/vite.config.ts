@@ -1,41 +1,35 @@
-import vue from '@vitejs/plugin-vue'
-import { defineConfig } from 'vite'
-import Components from 'unplugin-vue-components/vite'
-import Icons from 'unplugin-icons/vite'
-import IconsResolve from 'unplugin-icons/resolver'
+import path from "node:path";
+import { defineConfig } from "vite";
+import vue from "@vitejs/plugin-vue";
 
-export default defineConfig({
-  plugins: [
-    vue(),
-    Components({
-      resolvers: [IconsResolve()],
-      dts: false,
-    }),
-    Icons({
-      compiler: 'vue3',
-      autoInstall: true,
-    }),
-  ],
-  optimizeDeps: {
-    include: [
-      'feather-icons',
-      'highlight.js',
-      'highlight.js/lib/core',
-      'interactjs',
-      'lowlight',
-      'sortablejs',
-      'debug',
-    ],
-  },
-  server: {
-    proxy: {
-      '/api': {
-        target: 'http://127.0.0.1:8000',
-        changeOrigin: false,
-        headers: {
-          Host: 'analytics.localhost:8000',
+// Employee Analytics Portal — web frontend build config.
+// Follows the same frappe-ui vite plugin conventions used by other Frappe
+// frontend apps in this bench (see docs/05_FRONTEND_WEB_RULES.md).
+export default defineConfig(async ({ mode }) => {
+  const { default: frappeui } = await import("frappe-ui/vite");
+
+  return {
+    plugins: [
+      ...frappeui({
+        frontendRoute: "/analytics-portal",
+        lucideIcons: true,
+        jinjaBootData: true,
+        buildConfig: {
+          indexHtmlPath: "../analytics_portal/www/analytics-portal.html",
         },
+      }),
+      vue(),
+    ],
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "src"),
       },
     },
-  },
-})
+    optimizeDeps: {
+      include: ["frappe-ui > feather-icons", "showdown"],
+    },
+    define: {
+      __VUE_PROD_DEVTOOLS__: mode !== "production",
+    },
+  };
+});

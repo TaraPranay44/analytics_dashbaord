@@ -1,70 +1,43 @@
 <script setup lang="ts">
-import type { ActivityLogEntry } from '../types/activityLog'
-import { formatDate } from '../utils/formatDate'
-import { formatDuration } from '../utils/formatDuration'
+import type { ActivityLogRow } from "@/types/activityLog";
+import { formatDateLabel } from "@/utils/formatDate";
+import { formatClockTime, formatHours } from "@/utils/formatDuration";
+import { STRINGS } from "@/constants/stringConstants";
 
-interface Props {
-  logs: ActivityLogEntry[]
-}
+defineProps<{
+  rows: ActivityLogRow[];
+  loading: boolean;
+}>();
 
-const props = defineProps<Props>()
-
-function formatTime(time: string | null): string {
-  if (!time) return '—'
-  return time.slice(0, 5)
+/** "In progress" (no logout yet) vs "Completed" - both directly derivable
+ * from `logout_time`, no invented on-time/late judgment. */
+function statusFor(row: ActivityLogRow): { label: string; dotClass: string } {
+  if (!row.logout_time) return { label: "In progress", dotClass: "dot-brand" };
+  return { label: "Completed", dotClass: "dot-success" };
 }
 </script>
 
 <template>
-  <table class="log-table">
-    <thead>
-      <tr>
-        <th>Date</th>
-        <th>Login</th>
-        <th>Logout</th>
-        <th>Hours</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr v-if="logs.length === 0">
-        <td colspan="4" class="log-table__empty">No activity logs for this range.</td>
-      </tr>
-      <tr v-for="entry in logs" :key="entry.date">
-        <td>{{ formatDate(entry.date) }}</td>
-        <td>{{ formatTime(entry.login_time) }}</td>
-        <td>{{ formatTime(entry.logout_time) }}</td>
-        <td>{{ formatDuration(entry.total_hours) }}</td>
-      </tr>
-    </tbody>
-  </table>
+  <div class="card log-card">
+    <div class="log-table-head">
+      <span>DATE</span>
+      <span>LOGIN</span>
+      <span>LOGOUT</span>
+      <span>HOURS</span>
+      <span>STATUS</span>
+    </div>
+    <div v-if="loading" class="emp-table-status">{{ STRINGS.loadingLabel }}</div>
+    <template v-else-if="rows.length">
+      <div class="log-row" v-for="row in rows" :key="`${row.employee}-${row.date}`">
+        <div>{{ formatDateLabel(row.date) }}</div>
+        <div class="hide-mobile">{{ formatClockTime(row.login_time) }}</div>
+        <div class="hide-mobile">{{ formatClockTime(row.logout_time) }}</div>
+        <div>{{ formatHours(row.total_hours) }}</div>
+        <div class="status-cell">
+          <span class="dot-status" :class="statusFor(row).dotClass"></span>{{ statusFor(row).label }}
+        </div>
+      </div>
+    </template>
+    <div v-else class="emp-table-status">{{ STRINGS.noLogs }}</div>
+  </div>
 </template>
-
-<style scoped>
-.log-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  font-size: 13px;
-}
-
-.log-table th {
-  text-align: left;
-  font-weight: 600;
-  color: #6b7280;
-  font-size: 12px;
-  padding: 6px 10px;
-  border-bottom: 1px solid #e2e5eb;
-}
-
-.log-table td {
-  padding: 6px 10px;
-  border-bottom: 1px solid #f0f1f4;
-  font-variant-numeric: tabular-nums;
-}
-
-.log-table__empty {
-  text-align: center;
-  color: #6b7280;
-  padding: 20px 0;
-}
-</style>

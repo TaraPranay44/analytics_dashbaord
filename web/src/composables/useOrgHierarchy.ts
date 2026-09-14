@@ -1,18 +1,25 @@
-import { useQuery } from '@tanstack/vue-query'
-import { fetchOrgHierarchy } from '../api/orgApi'
-import type { Ref } from 'vue'
+import { computed, type Ref, unref } from "vue";
+import { useQuery } from "@tanstack/vue-query";
+import { fetchOrgHierarchy } from "@/api/orgApi";
 
-export function useOrgHierarchy(employeeId: Ref<string>) {
+/**
+ * ViewModel for `OrgHierarchyView` - manager chain and direct reports
+ * (`org_hierarchy`). Added alongside `OrgHierarchyView.vue` in this change;
+ * see docs/05_FRONTEND_WEB_RULES.md §6 for the corresponding file-tree entry.
+ */
+export function useOrgHierarchy(employeeId: Ref<string> | string) {
+  const idRef = computed(() => unref(employeeId));
+
   const query = useQuery({
-    queryKey: ['org', 'hierarchy', employeeId],
-    queryFn: () => fetchOrgHierarchy(employeeId.value),
-    enabled: () => !!employeeId.value,
-  })
+    queryKey: computed(() => ["employee", idRef.value, "org-hierarchy"] as const),
+    queryFn: () => fetchOrgHierarchy(idRef.value),
+    enabled: computed(() => Boolean(idRef.value)),
+  });
 
   return {
-    hierarchy: query.data,
-    isLoading: query.isLoading,
+    managerChain: computed(() => query.data.value?.manager_chain ?? []),
+    directReports: computed(() => query.data.value?.direct_reports ?? []),
+    isLoading: query.isPending,
     isError: query.isError,
-    error: query.error,
-  }
+  };
 }

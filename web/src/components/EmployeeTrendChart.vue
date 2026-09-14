@@ -1,147 +1,126 @@
 <script setup lang="ts">
-import { ref, onMounted, onBeforeUnmount, watch } from 'vue'
-import {
-  Chart,
-  LineController,
-  LineElement,
-  PointElement,
-  LinearScale,
-  CategoryScale,
-  Tooltip,
-  Filler,
-} from 'chart.js'
-import type { EmployeeTrendPoint } from '../types/employee'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from "vue";
+import { Chart, type ChartConfiguration } from "chart.js/auto";
+import type { TrendPoint } from "@/types/employee";
+import { formatMonthLabel, formatShortDate } from "@/utils/formatDate";
+import { useEmployeeMonthlyTrend } from "@/composables/useEmployeeMonthlyTrend";
 
-Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Tooltip, Filler)
+const props = defineProps<{ trend: TrendPoint[]; employeeId: string }>();
 
-interface Props {
-  trend: EmployeeTrendPoint[]
-}
+type ChartWindow = "7d" | "30d" | "lifetime";
+const chartWindow = ref<ChartWindow>("30d");
+const isLifetime = computed(() => chartWindow.value === "lifetime");
 
-const props = defineProps<Props>()
+// "Lifetime" is a separate endpoint (`employee_monthly_trend`, monthly
+// averages from `Employee Monthly Stats`) - the daily `trend` prop only ever
+// covers `EMPLOYEE_DETAIL_TREND_DAYS`, so it can't honestly answer "lifetime".
+// Fetched lazily, only once this view is actually selected.
+const { months, isFetching: monthsFetching } = useEmployeeMonthlyTrend(
+  computed(() => props.employeeId),
+  isLifetime,
+);
 
-const canvasRef = ref<HTMLCanvasElement | null>(null)
-let chartInstance: Chart | null = null
+const chartLabels = computed(() => {
+  if (chartWindow.value === "7d") return props.trend.slice(-7).map((p) => formatShortDate(p.date));
+  if (chartWindow.value === "30d") return props.trend.map((p) => formatShortDate(p.date));
+  return months.value.map((p) => formatMonthLabel(p.year_month));
+});
 
-function shortDate(dateStr: string): string {
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })
-}
+const chartValues = computed(() => {
+  if (chartWindow.value === "7d") return props.trend.slice(-7).map((p) => p.total_hours);
+  if (chartWindow.value === "30d") return props.trend.map((p) => p.total_hours);
+  return months.value.map((p) => p.avg_hours);
+});
 
-function buildChart(): void {
-  if (!canvasRef.value) return
+// A single point draws no line at all - fall back to a visible dot so sparse
+// data (e.g. an employee with only one month of Employee Monthly Stats
+// computed so far) doesn't just look like a blank chart.
+const pointRadius = computed(() => (chartValues.value.length < 5 ? 4 : 0));
 
-  chartInstance = new Chart(canvasRef.value, {
-    type: 'line',
+const canvasRef = ref<HTMLCanvasElement | null>(null);
+let chart: Chart<"line"> | null = null;
+
+function buildOrUpdateChart(): void {
+  if (!canvasRef.value) return;
+  const labels = chartLabels.value;
+  const values = chartValues.value;
+
+  if (chart) {
+    chart.data.labels = labels;
+    chart.data.datasets[0].data = values;
+    chart.data.datasets[0].pointRadius = pointRadius.value;
+    chart.update();
+    return;
+  }
+
+  const config: ChartConfiguration<"line"> = {
+    type: "line",
     data: {
-      labels: props.trend.map((point) => shortDate(point.date)),
+      labels,
       datasets: [
         {
-          label: 'Hours worked',
-          data: props.trend.map((point) => point.hours),
-          borderColor: '#3b5bdb',
-          backgroundColor: 'rgba(59, 91, 219, 0.08)',
+          label: "Hours",
+          data: values,
+          borderColor: "#8A6BFF",
+          backgroundColor: "rgba(138, 107, 255, 0.18)",
+          pointBackgroundColor: "#8A6BFF",
+          tension: 0.35,
           fill: true,
-          tension: 0.3,
-          pointRadius: 2,
-          pointHoverRadius: 4,
-          borderWidth: 2,
+          pointRadius: pointRadius.value,
+          pointHoverRadius: 5,
+          borderWidth: 2.5,
         },
       ],
     },
     options: {
       responsive: true,
       maintainAspectRatio: false,
-      plugins: {
-        legend: { display: false },
-        tooltip: {
-          callbacks: {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            label: (context: any) => `${context.parsed.y.toFixed(1)}h`,
-          },
-        },
-      },
+      plugins: { legend: { display: false } },
       scales: {
-        y: {
-          beginAtZero: true,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          ticks: { callback: (value: any) => `${value}h` },
-        },
-        x: {
-          ticks: { maxRotation: 0, autoSkip: true, maxTicksLimit: 8 },
-        },
+        y: { beginAtZero: true, grid: { color: "rgba(21,20,43,0.05)" } },
+        x: { grid: { display: false } },
       },
     },
-  })
+  };
+  chart = new Chart(canvasRef.value, config);
 }
 
-function updateChartData(): void {
-  if (!chartInstance) return
-  chartInstance.data.labels = props.trend.map((point) => shortDate(point.date))
-  chartInstance.data.datasets[0].data = props.trend.map((point) => point.hours)
-  chartInstance.update()
-}
-
-onMounted(() => {
-  buildChart()
-})
-
-onBeforeUnmount(() => {
-  chartInstance?.destroy()
-  chartInstance = null
-})
-
-watch(
-  () => props.trend,
-  () => {
-    if (chartInstance) {
-      updateChartData()
-    } else {
-      buildChart()
-    }
-  },
-  { deep: true },
-)
+onMounted(buildOrUpdateChart);
+watch([chartLabels, chartValues], buildOrUpdateChart);
+onBeforeUnmount(() => chart?.destroy());
 </script>
 
 <template>
-  <section class="trend-chart">
-    <h3 class="trend-chart__title">Hours trend</h3>
-
-    <div v-if="trend.length === 0" class="trend-chart__empty">
-      No trend data available for this employee yet.
+  <div class="card trend-card">
+    <div class="trend-card-head">
+      <h3>Time spent / day</h3>
+      <div class="window-toggle">
+        <button class="window-toggle-btn" type="button" :class="{ active: chartWindow === '7d' }" @click="chartWindow = '7d'">
+          Last 7 days
+        </button>
+        <button class="window-toggle-btn" type="button" :class="{ active: chartWindow === '30d' }" @click="chartWindow = '30d'">
+          Last {{ trend.length }} days
+        </button>
+        <button
+          class="window-toggle-btn"
+          type="button"
+          :class="{ active: chartWindow === 'lifetime' }"
+          @click="chartWindow = 'lifetime'"
+        >
+          Lifetime
+        </button>
+      </div>
     </div>
-    <div v-else class="trend-chart__canvas-wrapper">
-      <canvas ref="canvasRef" role="img" aria-label="Line chart of daily hours worked over time"></canvas>
+    <p v-if="isLifetime && monthsFetching" class="trend-chart-note">Loading lifetime trend…</p>
+    <p v-else-if="isLifetime && !months.length" class="trend-chart-note">
+      No monthly stats computed yet for this employee.
+    </p>
+    <p v-else-if="isLifetime && months.length < 2" class="trend-chart-note">
+      Only {{ months.length }} month of history computed so far — the dot below is it. More months will
+      appear here as the nightly aggregation job accumulates them.
+    </p>
+    <div class="trend-chart-canvas-wrap trend-chart-canvas-wrap-lg">
+      <canvas ref="canvasRef"></canvas>
     </div>
-  </section>
+  </div>
 </template>
-
-<style scoped>
-.trend-chart {
-  border: 1px solid #e2e5eb;
-  border-radius: 6px;
-  background: #ffffff;
-  padding: 20px 24px;
-  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  color: #1a1f2b;
-}
-
-.trend-chart__title {
-  margin: 0 0 16px;
-  font-size: 15px;
-  font-weight: 600;
-}
-
-.trend-chart__canvas-wrapper {
-  position: relative;
-  height: 260px;
-}
-
-.trend-chart__empty {
-  padding: 40px 0;
-  text-align: center;
-  font-size: 13px;
-  color: #6b7280;
-}
-</style>

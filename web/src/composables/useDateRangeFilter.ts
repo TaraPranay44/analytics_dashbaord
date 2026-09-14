@@ -1,40 +1,35 @@
-import { ref, computed } from 'vue'
+import { ref } from "vue";
 
-export type DateRangePreset = 'this-week' | 'this-month' | 'custom'
+function isoDateDaysAgo(days: number): string {
+  const target = new Date();
+  target.setDate(target.getDate() - days);
+  return target.toISOString().slice(0, 10);
+}
 
+function isoToday(): string {
+  return new Date().toISOString().slice(0, 10);
+}
+
+/**
+ * ViewModel for the activity-log date-range quick filter. Leaving both bounds
+ * `null` (the default) means "all time" - the backend applies its own
+ * trailing-30-day default only when both are omitted (docs/04_BACKEND_RULES.md
+ * §9 `date_utils.resolve_date_range`); an explicit "All time" clears back to
+ * that same null/null state rather than a hardcoded wide range.
+ */
 export function useDateRangeFilter() {
-  const preset = ref<DateRangePreset>('this-month')
-  const customFrom = ref('')
-  const customTo = ref('')
+  const fromDate = ref<string | null>(null);
+  const toDate = ref<string | null>(null);
 
-  const fromDate = computed(() => {
-    const now = new Date()
-    if (preset.value === 'this-week') {
-      const day = now.getDay()
-      const start = new Date(now)
-      start.setDate(now.getDate() - day)
-      return start.toISOString().slice(0, 10)
-    }
-    if (preset.value === 'this-month') {
-      return new Date(now.getFullYear(), now.getMonth(), 1)
-        .toISOString()
-        .slice(0, 10)
-    }
-    return customFrom.value
-  })
-
-  const toDate = computed(() => {
-    if (preset.value === 'custom') {
-      return customTo.value
-    }
-    return new Date().toISOString().slice(0, 10)
-  })
-
-  return {
-    preset,
-    customFrom,
-    customTo,
-    fromDate,
-    toDate,
+  function applyLastNDays(days: number): void {
+    fromDate.value = isoDateDaysAgo(days);
+    toDate.value = isoToday();
   }
+
+  function clear(): void {
+    fromDate.value = null;
+    toDate.value = null;
+  }
+
+  return { fromDate, toDate, applyLastNDays, clear };
 }

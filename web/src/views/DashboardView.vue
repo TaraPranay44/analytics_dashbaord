@@ -1,98 +1,165 @@
 <script setup lang="ts">
-import { storeToRefs } from 'pinia'
-import { useRouter } from 'vue-router'
-import { useUiFilterStore } from '../store/uiFilterStore'
-import { useOrgDashboard } from '../composables/useOrgDashboard'
-import { useEmployeeList } from '../composables/useEmployeeList'
-import EmployeeSearchBar from '../components/EmployeeSearchBar.vue'
-import FilterBar from '../components/FilterBar.vue'
-import EmployeeListTable from '../components/EmployeeListTable.vue'
-import Pagination from '../components/Pagination.vue'
-import { ROUTE_NAMES } from '../constants/routeConstants'
-import { PAGE_SIZE_DEFAULT } from '../constants/apiConstants'
+import { computed } from "vue";
+import { storeToRefs } from "pinia";
+import { useUiFilterStore } from "@/store/uiFilterStore";
+import { useEmployeeList } from "@/composables/useEmployeeList";
+import { useOrgDashboard } from "@/composables/useOrgDashboard";
+import { useOrgInsights } from "@/composables/useOrgInsights";
+import EmployeeSearchBar from "@/components/EmployeeSearchBar.vue";
+import FilterBar from "@/components/FilterBar.vue";
+import EmployeeListTable from "@/components/EmployeeListTable.vue";
+import OrgStatTile from "@/components/OrgStatTile.vue";
+import Pagination from "@/components/Pagination.vue";
+import { formatHours, formatTimeOfDay } from "@/utils/formatDuration";
+import { formatDateLabel } from "@/utils/formatDate";
+import { computeOrgTrendInsights, headcountSparkline, loginTimeSparkline } from "@/utils/orgTrend";
 
-const router = useRouter()
-const uiFilterStore = useUiFilterStore()
-const { searchQuery, managerFilter, sort, page } = storeToRefs(uiFilterStore)
+const uiFilter = useUiFilterStore();
+const { q, manager, sort, start, limit } = storeToRefs(uiFilter);
 
-const { orgDashboard } = useOrgDashboard()
-const { employees, hasMore, isLoading } = useEmployeeList(
-  searchQuery,
-  managerFilter,
-  sort,
-  page
-)
+const { dashboard, isLoading: dashboardLoading } = useOrgDashboard();
+const { insights } = useOrgInsights();
+const {
+  rows,
+  hasMore,
+  isLoading: listLoading,
+  isFetching: listFetching,
+} = useEmployeeList({ q, manager, sort, start, limit });
 
-function goToEmployee(employeeId: string) {
-  router.push({ name: ROUTE_NAMES.EMPLOYEE_DETAIL, params: { employeeId } })
+interface Delta {
+  text: string;
+  direction: "up" | "down";
+}
+
+function buildDelta(change: number, unit: "%" | "min"): Delta {
+  const direction: "up" | "down" = change >= 0 ? "up" : "down";
+  const magnitude = unit === "%" ? Math.abs(change).toFixed(1) : Math.round(Math.abs(change)).toString();
+  return { text: `${direction === "up" ? "▲" : "▼"} ${magnitude}${unit === "%" ? "%" : " min"}`, direction };
+}
+
+const orgTrend = computed(() => computeOrgTrendInsights(dashboard.value?.history ?? []));
+
+const headcountDeltaText = computed<Delta | null>(() => {
+  const data = insights.value;
+  if (!data || !data.total_registered_employees_growth_window_start) return null;
+  const change =
+    ((data.total_registered_employees - data.total_registered_employees_growth_window_start) /
+      data.total_registered_employees_growth_window_start) *
+    100;
+  return buildDelta(change, "%");
+});
+
+const avgHoursDeltaText = computed<Delta | null>(() => {
+  const change = orgTrend.value.avgHoursChangePercent;
+  return change === null ? null : buildDelta(change, "%");
+});
+
+const avgLoginDeltaText = computed<Delta | null>(() => {
+  const change = orgTrend.value.avgLoginMinutesDelta;
+  return change === null ? null : buildDelta(change, "min");
+});
+
+const avgHoursSparkline = computed(() => (dashboard.value?.history ?? []).map((point) => point.avg_hours_org));
+const avgLoginSparkline = computed(() => loginTimeSparkline(dashboard.value?.history ?? []));
+const headcountTrendSparkline = computed(() => headcountSparkline(dashboard.value?.headcount_trend ?? []));
+
+function onSearchInput(value: string): void {
+  uiFilter.setQuery(value);
+}
+function onManagerChange(value: string | null): void {
+  uiFilter.setManager(value);
+}
+function onSortChange(value: string | null): void {
+  uiFilter.setSort(value);
+}
+function onClearFilters(): void {
+  uiFilter.reset();
+}
+function onNextPage(): void {
+  uiFilter.nextPage(hasMore.value);
+}
+function onPrevPage(): void {
+  uiFilter.prevPage();
 }
 </script>
 
 <template>
-  <div class="dashboard">
-    <div class="org-tiles">
-      <div class="tile">
-        <h3>Total Employees</h3>
-        <p>{{ orgDashboard?.total_employees ?? '—' }}</p>
-      </div>
-      <div class="tile">
-        <h3>Avg Hours (Org)</h3>
-        <p>{{ orgDashboard?.avg_hours_org ?? '—' }}</p>
-      </div>
-      <div class="tile">
-        <h3>Avg Login Time (Org)</h3>
-        <p>{{ orgDashboard?.avg_login_time_org ?? '—' }}</p>
-      </div>
-    </div>
+  <div class="app-shell">
+    <nav class="sidebar">
+      <div class="sidebar-logo"><div class="logo-mark"></div><span>Analytics</span></div>
+      <button class="nav-item active"><span class="dot"></span>Dashboard</button>
+      <div class="sidebar-spacer"></div>
+    </nav>
 
-    <div class="controls">
-      <EmployeeSearchBar v-model="searchQuery" />
-      <FilterBar v-model:manager="managerFilter" v-model:sort="sort" />
-    </div>
+    <main class="main">
+      <div class="topbar">
+        <span class="breadcrumb">Executive Dashboard</span>
+        <span v-if="dashboard?.date" class="as-of-label">as of {{ formatDateLabel(dashboard.date) }}</span>
+      </div>
 
-    <p v-if="isLoading">Loading...</p>
-    <EmployeeListTable
-      v-else
-      :employees="employees"
-      @row-click="goToEmployee"
-    />
+      <div class="body-content">
+        <div class="stat-grid">
+          <OrgStatTile
+            label="Total employees tracked"
+            :value="dashboardLoading ? '—' : (insights?.total_registered_employees ?? 0).toLocaleString()"
+            dot-color-var="var(--violet-500)"
+            :delta-text="headcountDeltaText?.text"
+            :delta-direction="headcountDeltaText?.direction"
+            :sparkline="headcountTrendSparkline"
+          />
+          <OrgStatTile
+            label="Org-wide avg hours/day"
+            :value="dashboardLoading ? '—' : formatHours(dashboard?.avg_hours_org)"
+            dot-color-var="var(--teal-500)"
+            :delta-text="avgHoursDeltaText?.text"
+            :delta-direction="avgHoursDeltaText?.direction"
+            :sparkline="avgHoursSparkline"
+          />
+          <OrgStatTile
+            label="Org-wide avg login time"
+            :value="dashboardLoading ? '—' : formatTimeOfDay(dashboard?.avg_login_time_org)"
+            dot-color-var="var(--amber-500)"
+            :delta-text="avgLoginDeltaText?.text"
+            :delta-direction="avgLoginDeltaText?.direction"
+            :sparkline="avgLoginSparkline"
+          />
+        </div>
 
-    <Pagination
-      v-model:page="page"
-      :page-size="PAGE_SIZE_DEFAULT"
-      :has-more="hasMore"
-    />
+        <div v-if="insights" class="insight-chips-row">
+          <span class="insight-chip">{{ insights.manager_count.toLocaleString() }} people-managers across the org</span>
+          <span class="insight-chip">
+            {{ insights.low_hours_employee_count.toLocaleString() }} employees averaging under
+            {{ insights.low_hours_threshold }} hrs/day
+          </span>
+          <span class="insight-chip">
+            {{ insights.recent_hires_count.toLocaleString() }} employees joined in the last
+            {{ insights.recent_hires_window_days }} days
+          </span>
+        </div>
+
+        <div class="search-row">
+          <EmployeeSearchBar :model-value="q" @update:model-value="onSearchInput" />
+        </div>
+
+        <FilterBar
+          :manager="manager"
+          :sort="sort"
+          @update:manager="onManagerChange"
+          @update:sort="onSortChange"
+          @clear="onClearFilters"
+        />
+
+        <EmployeeListTable :rows="rows" :loading="listLoading" :low-hours-threshold="insights?.low_hours_threshold ?? null" />
+        <Pagination
+          :start="start"
+          :limit="limit"
+          :row-count="rows.length"
+          :has-more="hasMore"
+          :loading="listFetching"
+          @prev="onPrevPage"
+          @next="onNextPage"
+        />
+      </div>
+    </main>
   </div>
 </template>
-
-<style scoped>
-.dashboard {
-  padding: 1.5rem;
-}
-.org-tiles {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1.5rem;
-}
-.tile {
-  flex: 1;
-  padding: 1rem;
-  border-radius: 8px;
-  border: 1px solid #333;
-}
-.tile h3 {
-  font-size: 0.85rem;
-  opacity: 0.7;
-  margin: 0 0 0.5rem;
-}
-.tile p {
-  font-size: 1.5rem;
-  font-weight: bold;
-  margin: 0;
-}
-.controls {
-  display: flex;
-  gap: 1rem;
-  margin-bottom: 1rem;
-}
-</style>

@@ -56,13 +56,10 @@ fixing a widget, writing a repository method) — those three are for scope/arch
 ```
 apps/analytics_portal/
 ├── analytics_portal/        # backend app code — see docs/04_BACKEND_RULES.md §11 for exact tree
-├── docs/                    # the 6 planning/rule docs referenced above
+├── docs/                    # the planning/rule docs referenced above
 ├── web/                     # Vue3 app — see docs/05_FRONTEND_WEB_RULES.md §6 for exact tree
 └── mobile/                  # Flutter app — see docs/06_MOBILE_RULES.md §6 for exact tree
 ```
-
-(Adjust the `web/`/`mobile/` paths above once those repos/folders actually exist in
-this bench — update this section the day they're added.)
 
 ---
 

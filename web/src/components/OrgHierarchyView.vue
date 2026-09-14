@@ -1,58 +1,64 @@
 <script setup lang="ts">
-import type { OrgHierarchyNode } from '../types/org'
+import { computed } from "vue";
+import type { DirectReport, ManagerChainEntry } from "@/types/employee";
+import { employeeDetailPath } from "@/constants/routeConstants";
+import { STRINGS } from "@/constants/stringConstants";
+import { avatarGradientFor, initialsFor } from "@/utils/avatar";
 
-interface Props {
-  node: OrgHierarchyNode
-}
+const props = defineProps<{
+  managerChain: ManagerChainEntry[];
+  directReports: DirectReport[];
+  loading: boolean;
+}>();
 
-defineProps<Props>()
+const directManager = computed(() => props.managerChain[0] ?? null);
+const restOfChain = computed(() => props.managerChain.slice(1));
 </script>
 
 <template>
-  <ul class="org-node">
-    <li>
-      <div class="org-node__person">
-        <span class="org-node__name">{{ node.employee_name }}</span>
-        <span class="org-node__id">{{ node.employee_id }}</span>
-      </div>
+  <div class="card org-hierarchy-card">
+    <div v-if="loading" class="emp-table-status">{{ STRINGS.loadingLabel }}</div>
+    <template v-else>
+      <section class="hierarchy-section">
+        <span class="filter-field-label">Manager</span>
+        <router-link
+          v-if="directManager"
+          class="person-row person-row-link"
+          :to="employeeDetailPath(directManager.employee_id)"
+        >
+          <div class="avatar-grad avatar-sm-fixed" :style="{ background: avatarGradientFor(directManager.employee_id) }">
+            <span class="avatar-initials">{{ initialsFor(directManager.employee_name) }}</span>
+          </div>
+          <span class="person-name">{{ directManager.employee_name }}</span>
+        </router-link>
+        <p v-else class="muted text-xs">No manager on file — top of the chain.</p>
 
-      <OrgHierarchyView
-        v-for="report in node.direct_reports"
-        :key="report.employee_id"
-        :node="report"
-      />
-    </li>
-  </ul>
+        <p v-if="restOfChain.length" class="hierarchy-chain-note">
+          Reports up through:
+          <template v-for="(manager, index) in restOfChain" :key="manager.employee_id">
+            <router-link :to="employeeDetailPath(manager.employee_id)">{{ manager.employee_name }}</router-link
+            ><span v-if="index < restOfChain.length - 1">, </span>
+          </template>
+        </p>
+      </section>
+
+      <section class="hierarchy-section">
+        <span class="filter-field-label">Direct reports ({{ directReports.length }})</span>
+        <div v-if="directReports.length" class="person-list">
+          <router-link
+            v-for="report in directReports"
+            :key="report.employee_id"
+            class="person-row person-row-link"
+            :to="employeeDetailPath(report.employee_id)"
+          >
+            <div class="avatar-grad avatar-sm-fixed" :style="{ background: avatarGradientFor(report.employee_id) }">
+              <span class="avatar-initials">{{ initialsFor(report.employee_name) }}</span>
+            </div>
+            <span class="person-name">{{ report.employee_name }}</span>
+          </router-link>
+        </div>
+        <p v-else class="empty-state-note">No direct reports — individual contributor.</p>
+      </section>
+    </template>
+  </div>
 </template>
-
-<style scoped>
-.org-node {
-  list-style: none;
-  margin: 0;
-  padding-left: 20px;
-  font-family: 'Inter', ui-sans-serif, system-ui, sans-serif;
-  font-size: 13px;
-}
-
-.org-node > li {
-  border-left: 1px solid #e2e5eb;
-  padding-left: 12px;
-  padding-bottom: 6px;
-}
-
-.org-node__person {
-  display: flex;
-  align-items: baseline;
-  gap: 8px;
-  padding: 4px 0;
-}
-
-.org-node__name {
-  font-weight: 500;
-}
-
-.org-node__id {
-  font-size: 11px;
-  color: #6b7280;
-}
-</style>
