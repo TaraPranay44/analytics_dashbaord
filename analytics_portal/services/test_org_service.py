@@ -6,6 +6,7 @@ from datetime import date
 import frappe
 from frappe.tests import IntegrationTestCase
 
+from analytics_portal.constants.api_constants import HEADCOUNT_TREND_MONTHS
 from analytics_portal.constants.cache_keys import org_dashboard_key
 from analytics_portal.services import org_service
 
@@ -41,6 +42,43 @@ class TestOrgService(IntegrationTestCase):
 
 		self.assertEqual(result["total_employees"], 105)
 		self.assertAlmostEqual(result["avg_hours_org"], 7.0, places=1)
+		self.assertIn("history", result)
+		self.assertEqual(result["history"][-1]["date"], date(2031, 1, 2))
+
+		self.assertIn("headcount_trend", result)
+		self.assertEqual(len(result["headcount_trend"]), HEADCOUNT_TREND_MONTHS)
+		for point in result["headcount_trend"]:
+			self.assertIn("year_month", point)
+			self.assertIn("cumulative_headcount", point)
+
+	def test_org_insights_returns_the_expected_shape(self) -> None:
+		# This bench's dev database has a large, separately-running seed job -
+		# assert shape/types, not exact counts, which would be a moving target.
+		result = org_service.get_org_insights()
+
+		self.assertEqual(
+			set(result.keys()),
+			{
+				"manager_count",
+				"total_registered_employees",
+				"total_registered_employees_growth_window_start",
+				"headcount_growth_window_days",
+				"low_hours_threshold",
+				"low_hours_employee_count",
+				"recent_hires_count",
+				"recent_hires_window_days",
+			},
+		)
+		self.assertGreaterEqual(result["manager_count"], 0)
+		self.assertGreaterEqual(result["total_registered_employees"], 0)
+		self.assertGreaterEqual(result["total_registered_employees_growth_window_start"], 0)
+		self.assertLessEqual(
+			result["total_registered_employees_growth_window_start"], result["total_registered_employees"]
+		)
+		self.assertEqual(result["headcount_growth_window_days"], 30)
+		self.assertGreaterEqual(result["low_hours_employee_count"], 0)
+		self.assertGreaterEqual(result["recent_hires_count"], 0)
+		self.assertEqual(result["recent_hires_window_days"], 90)
 
 	def test_org_hierarchy_returns_chain_and_reports(self) -> None:
 		manager = frappe.get_doc(

@@ -15,3 +15,22 @@ EMPLOYEE_LIST_CACHE_TTL_SECONDS: int = 90
 # docs/04_BACKEND_RULES.md §5 ("a trend series, e.g. daily hours for the
 # last 30 days").
 EMPLOYEE_DETAIL_TREND_DAYS: int = 30
+
+# Trailing window (days) of `Org Daily Stats` history embedded in
+# `org_dashboard`'s response, for the landing page's sparklines/trend badges.
+ORG_DASHBOARD_HISTORY_DAYS: int = 14
+
+# `org_insights`: how far below the org-wide average (`avg_hours_org`) counts
+# as "low hours" for the `low_hours_employee_count` figure.
+LOW_HOURS_MARGIN_HOURS: float = 1.0
+
+# `org_insights`: trailing window (days) for the "recently joined" headcount figure.
+RECENT_HIRES_WINDOW_DAYS: int = 90
+
+# `org_insights`: comparison window (days) for the registered-headcount growth figure.
+HEADCOUNT_GROWTH_WINDOW_DAYS: int = 30
+
+# `org_dashboard`: how many trailing months of registered-headcount snapshots
+# to embed as `headcount_trend`, for the "employees tracked" sparkline
+# (monthly, not daily - headcount barely moves day to day at this org's size).
+HEADCOUNT_TREND_MONTHS: int = 12

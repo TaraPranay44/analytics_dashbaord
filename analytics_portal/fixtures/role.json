@@ -1,0 +1,15 @@
+[
+ {
+  "desk_access": 1,
+  "disabled": 0,
+  "docstatus": 0,
+  "doctype": "Role",
+  "home_page": null,
+  "is_custom": 0,
+  "modified": "2026-09-14 00:09:08.131604",
+  "name": "Data Admin",
+  "restrict_to_domain": null,
+  "role_name": "Data Admin",
+  "two_factor_auth": 0
+ }
+]

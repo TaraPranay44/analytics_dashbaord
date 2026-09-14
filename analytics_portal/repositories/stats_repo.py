@@ -56,6 +56,7 @@ def get_all_employee_monthly_stats(employee_id: str) -> list[dict[str, Any]]:
 		"Employee Monthly Stats",
 		filters={"employee": employee_id},
 		fields=["year_month", "avg_hours", "avg_login_time", "avg_logout_time", "days_present"],
+		order_by="year_month asc",
 	)
 
 
@@ -131,6 +132,36 @@ def get_latest_org_daily_stats() -> dict[str, Any] | None:
 		limit=1,
 	)
 	return rows[0] if rows else None
+
+
+def count_employees_below_hours(threshold: float) -> int:
+	"""Count `Employee Overall Stats` rows with `avg_hours_overall` below `threshold`.
+
+	Args:
+	    threshold: the avg-hours cutoff (exclusive).
+
+	Returns:
+	    Matching row count.
+	"""
+	return frappe.db.count("Employee Overall Stats", filters={"avg_hours_overall": ["<", threshold]})
+
+
+def get_recent_org_daily_stats(days: int) -> list[dict[str, Any]]:
+	"""Fetch the last `days` `Org Daily Stats` rows, for the dashboard sparkline/trend.
+
+	Args:
+	    days: how many most-recent days to fetch.
+
+	Returns:
+	    A list of stats row dicts, ordered by `date` ascending (oldest first).
+	"""
+	rows = frappe.get_all(
+		"Org Daily Stats",
+		fields=["date", "total_employees", "avg_hours_org", "avg_login_time_org"],
+		order_by="date desc",
+		limit=days,
+	)
+	return list(reversed(rows))
 
 
 def upsert_employee_monthly_stats(

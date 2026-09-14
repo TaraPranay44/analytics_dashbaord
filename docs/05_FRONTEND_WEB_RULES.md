@@ -145,9 +145,11 @@ src/
 │   └── ComingSoonView.vue        # placeholder for Manager/Employee (future scope)
 ├── components/                  # Reusable dumb UI components (Views, per MVVM)
 │   ├── EmployeeSearchBar.vue
-│   ├── FilterBar.vue              # manager filter, sort control — sits alongside the search bar
+│   ├── FilterBar.vue              # manager filter (via ManagerFilterCombobox), sort control — sits alongside the search bar
+│   ├── ManagerFilterCombobox.vue   # typeahead over `employee_list` (q=text, small limit) — picks a manager by name, stores their employee_id; never loads "all managers" at once
 │   ├── EmployeeListTable.vue       # paginated, compact rows — NO charts, NO multi-metric summary
-│   ├── EmployeeListRow.vue         # single row: avatar, name/ID, manager, avg hrs/day, avg login, status
+│   ├── OrgStatTile.vue             # dashboard stat tile: label/value/delta badge/optional sparkline (org_dashboard/org_insights)
+│   ├── EmployeeListRow.vue         # single row: avatar, name/ID, manager, avg hrs/day, avg login
 │   ├── Pagination.vue              # "Showing X–Y of Z" + Prev/Next, used by EmployeeListTable
 │   ├── EmployeeSummaryPanel.vue    # rich metrics block — EmployeeDetailView ONLY, never the landing list
 │   ├── EmployeeTrendChart.vue      # the per-employee chart — EmployeeDetailView ONLY
@@ -159,12 +161,15 @@ src/
 │   ├── useEmployeeDetail.ts       # full detail incl. summary metrics + trend series (was useEmployeeSummary)
 │   ├── useEmployeeLogs.ts
 │   ├── useOrgDashboard.ts
+│   ├── useOrgInsights.ts          # dashboard insight-chip data (calls `org_insights`)
+│   ├── useOrgHierarchy.ts         # manager chain + direct reports for `OrgHierarchyView` (calls `org_hierarchy`)
+│   ├── useEmployeeMonthlyTrend.ts # lazy, `enabled`-gated fetch for `EmployeeTrendChart`'s "Lifetime" view (calls `employee_monthly_trend`)
 │   └── useDateRangeFilter.ts
 ├── api/                         # Model — data layer
 │   ├── client.ts                 # frappe-ui-based HTTP client setup
 │   ├── employeeApi.ts            # calls employee_list / employee_detail
 │   ├── logsApi.ts                # calls employee_logs
-│   └── orgApi.ts                 # calls org_dashboard / org_hierarchy
+│   └── orgApi.ts                 # calls org_dashboard / org_insights / org_hierarchy
 ├── types/
 │   ├── employee.ts                # includes a distinct EmployeeListRow type vs. EmployeeDetail type —
 │   │                               # the list row is intentionally a narrower shape, not a slice of detail
@@ -182,7 +187,10 @@ src/
 └── utils/
     ├── formatDate.ts
     ├── debounce.ts
-    └── formatDuration.ts
+    ├── formatDuration.ts
+    ├── avatar.ts                    # initialsFor/avatarGradientFor - shared by EmployeeListRow, EmployeeDetailView, OrgHierarchyView
+    ├── trendInsights.ts             # computeTrendInsights(trend) - derives real 7d-vs-prior-7d momentum + attendance rate from the employee_detail trend series (no fabricated fields)
+    └── orgTrend.ts                  # computeOrgTrendInsights(history) - same 7d-vs-prior-7d pattern for org_dashboard's embedded history; also loginTimeSparkline(history) and headcountSparkline(headcount_trend) for the dashboard tile sparklines
 ```
 
 ---
@@ -229,6 +237,35 @@ inline in a component or composable — import from these files.
   frequently — favor information density (compact row height, tight but legible
   spacing) over decorative empty space. Reserve generous whitespace for the
   hero/login screen, not for list or table views.
+
+---
+
+## 9a. Real API field shapes (do not add columns beyond these)
+
+The `Employee` DocType has no `department`/`location`/`status`/`email` fields
+today (see `docs/04_BACKEND_RULES.md` §5's actual response shapes). The
+approved static mockup this app's visual design is based on includes those
+columns/filters - they are **intentionally dropped** here (employee list has
+no Status/Location filters or columns; `EmployeeSummaryPanel` has 3 metric
+tiles, not 4 - no "Attendance %") because those fields don't exist on the
+backend. If those fields are added to `Employee`/`Employee Overall Stats`
+later, reintroducing the corresponding UI is a deliberate follow-up change,
+not something to guess back in from the mockup.
+
+`Pagination.vue` shows "Showing X–Y" + more-available, not "of Z total" - the
+paginated envelope (`{data, start, limit, has_more}`) never includes a total
+count, so a total cannot be displayed without hallucinating one.
+
+---
+
+## 9b. Serving the built app (website route + www module)
+
+The production build is served through Frappe's website router, not Vite:
+
+- `hooks.py` → `website_route_rules = [{"from_route": "/analytics-portal/<path:app_path>", "to_route": "analytics-portal"}]`
+- `analytics_portal/www/analytics-portal.html` — the built `index.html`, copied there by `web/`'s `npm run build` (`copy-html-entry` script). Gitignored - regenerate with `npm run build` in `web/`, don't hand-edit.
+- `analytics_portal/www/analytics_portal.py` — **filename uses an underscore, not a hyphen**, even though the route and the `.html` file use a hyphen. Frappe's `TemplatePage.set_pymodule` derives the expected Python module path by replacing `-` with `_` in the template's basename (`analytics-portal.html` → looks for `analytics_portal.py`) - name it with the hyphen and Frappe silently never loads `get_context()` (no error, just falls back to Website Settings' default boot data with no `csrf_token`, and any permission check inside `get_context()` never runs).
+- `get_context()` supplies `context.boot` (`csrf_token`, `frappe_version`, `site_name`) - consumed by the `<script>` block frappe-ui's `jinjaBootData` vite plugin appends to `web/index.html` at build time. `get_context_for_dev()` (dev-only, `developer_mode` only) is what `web/src/main.ts` calls instead when running under `vite dev`, since the dev server doesn't run Jinja.
 
 ---
 

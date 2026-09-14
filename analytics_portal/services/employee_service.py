@@ -92,3 +92,24 @@ def get_employee_detail(employee_id: str) -> dict[str, Any]:
 		}
 
 	return get_or_set(cache_key, None, _compute)
+
+
+def get_employee_monthly_trend(employee_id: str) -> list[dict[str, Any]]:
+	"""Lifetime monthly avg-hours trend for the detail page's "Lifetime" chart view.
+
+	Reads `Employee Monthly Stats` - never raw activity logs. Not paginated: a
+	per-employee month list is naturally bounded by tenure (at most a few
+	hundred rows even after decades), the same reasoning `get_org_hierarchy`
+	applies to `direct_reports` - see docs/04_BACKEND_RULES.md §5. Not cached
+	either: it's a small, already-indexed per-employee read, cheap enough not
+	to need the invalidation contract §6 requires for the cached endpoints.
+
+	Args:
+	    employee_id: the `Employee.employee_id` value.
+
+	Returns:
+	    A list of `{"year_month": "YYYY-MM", "avg_hours": float}`, oldest first.
+	"""
+	assert_employee_exists(employee_id)
+	monthly_rows = stats_repo.get_all_employee_monthly_stats(employee_id)
+	return [{"year_month": row.year_month, "avg_hours": row.avg_hours} for row in monthly_rows]

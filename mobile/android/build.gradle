@@ -1,0 +1,17 @@
+// Compatibility shim for AGP 8+ with older Android library plugins that
+// don't declare a `namespace` (AGP 8 requires one; pre-AGP-8 plugins only
+// set the package via AndroidManifest.xml). `isar_flutter_libs` 3.1.0+1
+// (docs/06_MOBILE_RULES.md §3's pinned Isar version) is one such plugin -
+// this backfills its namespace from its Gradle `group` at configuration
+// time, a standard, widely-used workaround for this exact AGP/Isar
+// incompatibility. Safe to remove once `isar_flutter_libs` ships a fix
+// upstream or the project moves to a maintained Isar fork.
+subprojects {
+    afterEvaluate { project ->
+        if (project.hasProperty('android')) {
+            if (project.android.namespace == null) {
+                project.android.namespace project.group
+            }
+        }
+    }
+}

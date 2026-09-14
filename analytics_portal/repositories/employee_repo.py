@@ -10,6 +10,7 @@ from typing import Any
 import frappe
 from frappe.query_builder import Criterion, DocType, Order
 from frappe.query_builder.functions import Count
+from frappe.utils import add_days, nowdate
 
 from analytics_portal.utils.pagination import paginate
 
@@ -165,3 +166,55 @@ def get_direct_reports(employee_id: str) -> list[dict[str, Any]]:
 		filters={"manager": employee_id},
 		fields=["employee_id", "employee_name"],
 	)
+
+
+def count_all_employees() -> int:
+	"""Total registered `Employee` headcount.
+
+	Distinct from `Org Daily Stats.total_employees` (headcount *with logged
+	activity* on a given day) - this is the org_insights "how many people work
+	here" figure.
+
+	Returns:
+	    Total row count of the `Employee` DocType.
+	"""
+	return frappe.db.count("Employee")
+
+
+def count_distinct_managers() -> int:
+	"""How many distinct employees are set as someone else's `manager`.
+
+	Returns:
+	    Count of distinct non-null `Employee.manager` values.
+	"""
+	row = frappe.db.sql("SELECT COUNT(DISTINCT manager) FROM `tabEmployee` WHERE manager IS NOT NULL")
+	return row[0][0] if row else 0
+
+
+def count_employees_joined_within_days(days: int) -> int:
+	"""How many employees have `date_of_joining` within the last `days` days.
+
+	Args:
+	    days: how many trailing days to count joins within.
+
+	Returns:
+	    Matching `Employee` row count.
+	"""
+	cutoff = add_days(nowdate(), -days)
+	return frappe.db.count("Employee", filters={"date_of_joining": [">=", cutoff]})
+
+
+def count_employees_registered_by(cutoff_date) -> int:
+	"""How many employees had already joined as of `cutoff_date`.
+
+	Used to derive a real headcount-growth figure (today's total vs. this
+	count from `HEADCOUNT_GROWTH_WINDOW_DAYS` ago) - employees with no
+	`date_of_joining` set are excluded rather than guessed at.
+
+	Args:
+	    cutoff_date: the date to count registrations up to (inclusive).
+
+	Returns:
+	    Matching `Employee` row count.
+	"""
+	return frappe.db.count("Employee", filters={"date_of_joining": ["<=", cutoff_date]})

@@ -74,6 +74,21 @@ class TestApiV1(IntegrationTestCase):
 		with self.assertRaises(frappe.DoesNotExistError):
 			employee_api.employee_detail(f"{_MARKER}-NOT-REAL")
 
+	def test_employee_monthly_trend_returns_a_plain_unpaginated_list(self) -> None:
+		frappe.get_doc(
+			{
+				"doctype": "Employee Monthly Stats",
+				"employee": self.employee.name,
+				"year_month": "2026-02",
+				"avg_hours": 7.5,
+				"days_present": 19,
+			}
+		).insert()
+
+		result = employee_api.employee_monthly_trend(self.employee.name)
+
+		self.assertEqual(result, [{"year_month": "2026-02", "avg_hours": 7.5}])
+
 	def test_employee_logs_returns_paginated_envelope(self) -> None:
 		result = logs_api.employee_logs(self.employee.name, "2026-08-01", "2026-08-02", start=0, limit=10)
 		self.assertEqual(len(result["data"]), 2)

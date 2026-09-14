@@ -6,6 +6,27 @@
 `04_BACKEND_RULES.md §5` — **do not invent a different API shape client-side.**
 Confirmed stack: **Flutter, Riverpod, Isar, Dio.**
 
+> **🔐 Auth resolution (updated after live-testing against a real bench):**
+> `04_BACKEND_RULES.md §5` documents only the `analytics_portal.api.v1.*`
+> endpoints — there is no documented authentication endpoint for a native
+> client (the web app instead rides the browser's existing Frappe session,
+> see `05_FRONTEND_WEB_RULES.md`/`authRoleStore.ts`). Initially `login_view.dart`
+> shipped as a pure demo (any non-empty input signs in), matching the web
+> app's role-picker pattern, since no backend was available to test against.
+> Once this project's own `bench` (site `employee-analytics.in`) was actually
+> run against the mobile app in an emulator, that demo behavior meant the
+> dashboard could never show real data (every `analytics_portal.api.v1.*`
+> call came back `PermissionError: ... not whitelisted` - Frappe's
+> `frappe.whitelist()` rejects unauthenticated/Guest requests by default).
+> `login_view.dart` now calls `DioClient.login()` for real (standard
+> Frappe-core `/api/method/login` session-cookie auth, not an invented
+> `analytics_portal` endpoint) and only navigates to the dashboard on a real
+> successful sign-in; Manager/Employee stay pure client-side role picks (no
+> backend call - those dashboards don't exist yet regardless of credentials).
+> This is still a minimal/session-cookie-only auth flow (no token refresh, no
+> persisted session across app restarts) - harden it if mobile auth becomes
+> real Phase 2+ scope, but it is no longer a stubbed-out gap.
+
 ---
 
 ## 0. How an AI agent must use this document
@@ -110,8 +131,9 @@ what's listed here without flagging it as a deviation.
 ## 5. Data-fetching, caching & pagination rules
 
 - Activity log lists use **paginated fetch** matching the backend's `start`/`limit`
-  contract (`04_BACKEND_RULES.md §5`) — infinite-scroll pattern in the View, driven
-  by an `AsyncNotifier` that appends pages, never "fetch everything then paginate
+  contract (`04_BACKEND_RULES.md §5`) — a discrete Prev/Next pager in the View
+  (`PaginationBar`, mirroring `web/src/components/Pagination.vue`), one page
+  fetched per request via the ViewModel, never "fetch everything then paginate
   client-side."
 - Isar is used as a **read-through cache**: last-fetched summary/logs are cached
   locally so the app shows something on poor connectivity, then refreshes once the
@@ -129,47 +151,81 @@ lib/
 │   ├── network/
 │   │   └── dio_client.dart          # single configured Dio instance + interceptors
 │   ├── cache/
-│   │   └── isar_client.dart          # Isar instance setup, schema registration
+│   │   ├── isar_client.dart          # Isar instance setup, schema registration, read-through helpers
+│   │   └── cached_json_entry.dart    # the single @collection backing every feature's cache (§2 addition)
 │   ├── constants/
 │   │   ├── api_constants.dart        # endpoint paths (must match backend §5)
 │   │   ├── string_constants.dart     # UI copy
-│   │   └── cache_constants.dart      # Isar box/collection names, TTLs
-│   └── errors/
-│       └── failures.dart             # typed failure classes (NetworkFailure, NotFoundFailure, etc.)
+│   │   └── cache_constants.dart      # Isar collection name, cache keys, TTLs
+│   ├── errors/
+│   │   └── failures.dart             # typed failure classes (NetworkFailure, NotFoundFailure, etc.)
+│   └── providers/
+│       └── core_providers.dart       # app-wide Riverpod singletons (DioClient, IsarClient) — addition,
+│                                      # not a feature so it doesn't fit under features/
 ├── features/
 │   ├── auth/
 │   │   └── presentation/
-│   │       ├── login_view.dart        # 3 role buttons: CEO / Manager / Employee
+│   │       ├── auth_role_provider.dart # PortalRole StateProvider — no persistence, demo-only (§8)
+│   │       ├── login_view.dart        # see the visual-design note below
 │   │       └── coming_soon_view.dart  # placeholder for Manager/Employee (future scope)
 │   ├── dashboard/
 │   │   ├── presentation/
 │   │   │   ├── dashboard_view.dart
-│   │   │   └── dashboard_view_model.dart   # Riverpod provider
+│   │   │   └── dashboard_view_model.dart   # org_dashboard + org_insights providers
 │   │   ├── domain/
 │   │   │   ├── entities/org_summary.dart
-│   │   │   └── use_cases/get_org_dashboard.dart
+│   │   │   ├── entities/org_insights.dart          # addition — org_insights response shape
+│   │   │   ├── repositories/org_repository.dart     # addition — the Domain-layer interface §1 requires
+│   │   │   └── use_cases/
+│   │   │       ├── get_org_dashboard.dart
+│   │   │       ├── get_org_insights.dart             # addition
+│   │   │       └── compute_org_trend_insights.dart   # addition — pure momentum calc, mirrors web's orgTrend.ts
 │   │   └── data/
 │   │       ├── org_repository_impl.dart
-│   │       ├── org_remote_data_source.dart   # Dio calls
+│   │       ├── org_remote_data_source.dart   # Dio calls + JSON→Entity mapping
 │   │       └── org_local_data_source.dart    # Isar cache
 │   ├── employee_list/                 # renamed from employee_search — see correction note below
 │   │   ├── presentation/
-│   │   │   ├── employee_list_view.dart      # paginated list — NO inline charts, NO per-row summary
-│   │   │   ├── employee_list_item.dart      # single compact row widget
-│   │   │   └── employee_list_view_model.dart
-│   │   ├── domain/ (entities/use_cases — EmployeeListItem entity is intentionally
-│   │   │             narrower than the EmployeeDetail entity, not a slice of it)
-│   │   └── data/ (repository_impl, remote/local data sources)
+│   │   │   ├── employee_list_view.dart      # search+filters+paginated rows+pager — embedded inside
+│   │   │   │                                 # dashboard_view.dart, same screen as the mockup
+│   │   │   ├── employee_list_item.dart      # single compact row widget — NO inline charts, NO per-row summary
+│   │   │   ├── manager_filter_field.dart    # addition — mobile modal-sheet adaptation of web's
+│   │   │   │                                 # inline ManagerFilterCombobox, same endpoint/semantics
+│   │   │   └── employee_list_view_model.dart # filter state + employeeListProvider + manager-search providers
+│   │   ├── domain/
+│   │   │   ├── entities/employee_list_item.dart   # intentionally narrower than EmployeeDetail, not a slice of it
+│   │   │   ├── entities/employee_sort_option.dart # addition — the only 2 sorts the backend actually supports
+│   │   │   ├── repositories/employee_list_repository.dart  # addition
+│   │   │   └── use_cases/get_employee_list.dart
+│   │   └── data/ (employee_list_repository_impl.dart, remote/local data sources)
 │   └── employee_detail/
 │       ├── presentation/
-│       │   ├── employee_detail_view.dart    # summary metrics + trend chart + activity log
+│       │   ├── employee_detail_view.dart    # header + hierarchy + profile + summary + chart + log
 │       │   ├── employee_trend_chart.dart    # the per-employee chart — lives ONLY here
-│       │   └── employee_detail_view_model.dart
-│       ├── domain/ (entities/use_cases)
-│       └── data/ (repository_impl, remote/local data sources)
+│       │   ├── employee_summary_panel.dart  # addition — performance-metrics card
+│       │   ├── org_hierarchy_card.dart      # addition — manager chain + direct reports card
+│       │   ├── activity_log_list.dart       # addition — date-range filter + paginated log rows
+│       │   └── employee_detail_view_model.dart # detail/hierarchy/logs/monthly-trend providers, .family per employeeId
+│       ├── domain/
+│       │   ├── entities/ (employee_detail.dart, org_hierarchy.dart, monthly_trend_point.dart, activity_log_row.dart)
+│       │   ├── repositories/employee_detail_repository.dart  # addition
+│       │   └── use_cases/
+│       │       ├── get_employee_detail.dart
+│       │       ├── get_org_hierarchy.dart            # addition — org_hierarchy powers the manager/reports card
+│       │       ├── get_employee_logs_page.dart       # addition — employee_logs, embedded in this screen
+│       │       ├── get_employee_monthly_trend.dart   # addition — the "Lifetime" chart view
+│       │       └── compute_trend_insights.dart       # addition — pure momentum calc, mirrors web's trendInsights.ts
+│       └── data/ (employee_detail_repository_impl.dart, remote/local data sources)
 └── shared/
-    ├── widgets/                       # shared dumb widgets (DateRangeFilter, PaginationBar, FilterChip, etc.)
-    └── theme/
+    ├── widgets/         # dumb widgets: AvatarBadge, PaginationBar, StatTile, DeltaBadge,
+    │                     # SparklineChart, AreaTrendChart (hand-rolled CustomPainter charts —
+    │                     # no charting package added, see §3 addition note), AsyncValueView
+    ├── theme/            # app_colors.dart, app_theme.dart
+    ├── utils/            # addition — formatters.dart, avatar_utils.dart, debouncer.dart (pure,
+    │                     # cross-feature helpers; mirrors web/src/utils/)
+    └── models/           # addition — paginated_result.dart, the shared `{data,start,limit,has_more}`
+                          # envelope every list endpoint returns (§5), used by employee_list and
+                          # employee_detail's logs page alike
 ```
 
 > **⚠️ Correction note (post-review):** this feature was originally `employee_search`,
@@ -178,6 +234,24 @@ lib/
 > employees. It's renamed to **`employee_list`**, is always paginated
 > (`PaginationBar` in `shared/widgets/`), and its rows never carry charts or
 > multi-metric summaries — that content exists only in `employee_detail`.
+
+> **📱 Login screen visual-design note:** §6 previously described `login_view.dart`
+> as "3 role buttons: CEO / Manager / Employee." The attached mobile mockup
+> (`mobile-login (1).html`) instead draws a gradient-hero email/password
+> sign-in form. The shipped `login_view.dart` follows the mockup's visual
+> design for the CEO sign-in path (now wired to a real `DioClient.login()`
+> call, see the auth-resolution note at the top of this doc), and adds two
+> secondary "Manager"/"Employee" buttons below the form (routing to
+> `coming_soon_view.dart`) so §8's "all three role buttons ship now"
+> requirement still holds. Flagged here rather than silently reconciled — ask
+> if a different resolution is wanted.
+
+> **ℹ️ No charting package added:** `employee_trend_chart.dart`'s "Time spent /
+> day" chart and the dashboard's stat-tile sparklines are hand-rolled with
+> Flutter's `CustomPainter` (`shared/widgets/area_trend_chart.dart`,
+> `sparkline_chart.dart`), not a third-party charting library — keeps the
+> package list in §3 exactly as fixed, and mirrors how the reference mockups
+> themselves draw their charts (inline SVG, no chart.js-equivalent on mobile).
 
 **Rule:** every feature folder repeats the same three sub-layers
 (`presentation/domain/data`) — no feature skips a layer, even if a layer is thin.

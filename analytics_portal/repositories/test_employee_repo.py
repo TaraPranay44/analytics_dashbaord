@@ -97,3 +97,87 @@ class TestEmployeeRepo(IntegrationTestCase):
 	def test_get_direct_reports(self) -> None:
 		reports = employee_repo.get_direct_reports(self.manager.name)
 		self.assertEqual({r.employee_id for r in reports}, {self.report_one.name, self.report_two.name})
+
+	def test_count_all_employees_reflects_the_full_table(self) -> None:
+		# Global count, not `_MARKER`-scoped, and deliberately NOT using
+		# `_MARKER`/`self.manager` for the throwaway fixture below - the other
+		# tests in this class assert exact `q=_MARKER` result sets, and
+		# `IntegrationTestCase` only rolls back at class teardown, so an extra
+		# `_MARKER`-tagged row here would leak into and break those.
+		other_marker = f"ZQATEST-COUNTALL-{frappe.generate_hash(length=6)}"
+		before = employee_repo.count_all_employees()
+		frappe.get_doc(
+			{
+				"doctype": "Employee",
+				"employee_name": f"{other_marker} Count Test",
+				"employee_id": other_marker,
+			}
+		).insert()
+		after = employee_repo.count_all_employees()
+		self.assertEqual(after, before + 1)
+
+	def test_count_distinct_managers_counts_unique_managers_only(self) -> None:
+		other_marker = f"ZQATEST-MGRCOUNT-{frappe.generate_hash(length=6)}"
+		own_manager = frappe.get_doc(
+			{
+				"doctype": "Employee",
+				"employee_name": f"{other_marker} Manager",
+				"employee_id": f"{other_marker}-MGR",
+			}
+		).insert()
+		before = employee_repo.count_distinct_managers()
+		frappe.get_doc(
+			{
+				"doctype": "Employee",
+				"employee_name": f"{other_marker} Report One",
+				"employee_id": f"{other_marker}-EMP1",
+				"manager": own_manager.name,
+			}
+		).insert()
+		after_first_report = employee_repo.count_distinct_managers()
+		self.assertEqual(after_first_report, before + 1)
+
+		# A second report under the SAME manager must not increase the
+		# distinct count further.
+		frappe.get_doc(
+			{
+				"doctype": "Employee",
+				"employee_name": f"{other_marker} Report Two",
+				"employee_id": f"{other_marker}-EMP2",
+				"manager": own_manager.name,
+			}
+		).insert()
+		after_second_report = employee_repo.count_distinct_managers()
+		self.assertEqual(after_second_report, after_first_report)
+
+	def test_count_employees_joined_within_days(self) -> None:
+		other_marker = f"ZQATEST-JOINWINDOW-{frappe.generate_hash(length=6)}"
+		before = employee_repo.count_employees_joined_within_days(1)
+		frappe.get_doc(
+			{
+				"doctype": "Employee",
+				"employee_name": f"{other_marker} Just Joined",
+				"employee_id": other_marker,
+				"date_of_joining": frappe.utils.nowdate(),
+			}
+		).insert()
+		after = employee_repo.count_employees_joined_within_days(1)
+		self.assertEqual(after, before + 1)
+
+	def test_count_employees_registered_by_excludes_later_joiners(self) -> None:
+		from frappe.utils import add_days, nowdate
+
+		other_marker = f"ZQATEST-REGBY-{frappe.generate_hash(length=6)}"
+		cutoff = add_days(nowdate(), -1)
+		before = employee_repo.count_employees_registered_by(cutoff)
+		frappe.get_doc(
+			{
+				"doctype": "Employee",
+				"employee_name": f"{other_marker} Joins Today",
+				"employee_id": other_marker,
+				"date_of_joining": nowdate(),
+			}
+		).insert()
+		# Joined today, which is AFTER `cutoff` (yesterday) - must not be counted.
+		after = employee_repo.count_employees_registered_by(cutoff)
+		self.assertEqual(after, before)

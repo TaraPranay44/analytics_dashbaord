@@ -52,3 +52,17 @@ def employee_detail(employee_id: str) -> dict:
 	    Employee detail fields, manager chain, summary metrics, and trend series.
 	"""
 	return employee_service.get_employee_detail(employee_id)
+
+
+@frappe.whitelist()
+def employee_monthly_trend(employee_id: str) -> list[dict]:
+	"""Lifetime monthly avg-hours trend for one employee (detail page "Lifetime" chart view).
+
+	Args:
+	    employee_id: the `Employee.employee_id` value.
+
+	Returns:
+	    A list of `{"year_month": "YYYY-MM", "avg_hours": float}`, oldest first.
+	    Not paginated - see docs/04_BACKEND_RULES.md §5 (naturally bounded by tenure).
+	"""
+	return employee_service.get_employee_monthly_trend(employee_id)
