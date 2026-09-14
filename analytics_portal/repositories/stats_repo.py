@@ -2,12 +2,15 @@
 `Employee Monthly Stats`, `Employee Overall Stats`, `Org Daily Stats`.
 
 Anything "average" is read from these tables, never computed by scanning
-`Employee Activity Log` at request time — see docs/04_BACKEND_RULES.md §7.
+`Employee Activity Log` at request time - see docs/04_BACKEND_RULES.md §7.
 The write-side functions here are used only by the nightly jobs in `jobs/`.
 """
 
 from datetime import date, time
 from typing import Any
+
+import frappe
+from frappe.utils import now_datetime
 
 
 def get_employee_monthly_stats(employee_id: str, year_month: str) -> dict[str, Any] | None:
@@ -20,7 +23,53 @@ def get_employee_monthly_stats(employee_id: str, year_month: str) -> dict[str, A
 	Returns:
 	    The stats row as a dict, or None if not yet computed.
 	"""
-	raise NotImplementedError
+	rows = frappe.get_all(
+		"Employee Monthly Stats",
+		filters={"employee": employee_id, "year_month": year_month},
+		fields=[
+			"name",
+			"employee",
+			"year_month",
+			"avg_hours",
+			"avg_login_time",
+			"avg_logout_time",
+			"days_present",
+		],
+		limit=1,
+	)
+	return rows[0] if rows else None
+
+
+def get_all_employee_monthly_stats(employee_id: str) -> list[dict[str, Any]]:
+	"""Fetch every `Employee Monthly Stats` row for one employee (all months).
+
+	Used by `jobs/recompute_overall_stats.py` to fold monthly rows into the
+	employee's lifetime aggregate - never reads raw activity logs.
+
+	Args:
+	    employee_id: the `Employee.employee_id` value.
+
+	Returns:
+	    A list of monthly stats row dicts, one per month with data.
+	"""
+	return frappe.get_all(
+		"Employee Monthly Stats",
+		filters={"employee": employee_id},
+		fields=["year_month", "avg_hours", "avg_login_time", "avg_logout_time", "days_present"],
+	)
+
+
+def get_employees_with_monthly_stats() -> list[str]:
+	"""Return distinct employee IDs that have at least one `Employee Monthly Stats` row.
+
+	Used by `jobs/recompute_overall_stats.py` to know which employees need
+	their `Employee Overall Stats` row refreshed.
+
+	Returns:
+	    A list of distinct `Employee.employee_id` values.
+	"""
+	rows = frappe.get_all("Employee Monthly Stats", fields=["employee"], distinct=True)
+	return [row.employee for row in rows]
 
 
 def get_employee_overall_stats(employee_id: str) -> dict[str, Any] | None:
@@ -32,7 +81,20 @@ def get_employee_overall_stats(employee_id: str) -> dict[str, Any] | None:
 	Returns:
 	    The stats row as a dict, or None if not yet computed.
 	"""
-	raise NotImplementedError
+	rows = frappe.get_all(
+		"Employee Overall Stats",
+		filters={"employee": employee_id},
+		fields=[
+			"name",
+			"employee",
+			"avg_hours_overall",
+			"avg_login_time_overall",
+			"avg_logout_time_overall",
+			"last_computed",
+		],
+		limit=1,
+	)
+	return rows[0] if rows else None
 
 
 def get_org_daily_stats(target_date: date) -> dict[str, Any] | None:
@@ -44,7 +106,31 @@ def get_org_daily_stats(target_date: date) -> dict[str, Any] | None:
 	Returns:
 	    The stats row as a dict, or None if not yet computed.
 	"""
-	raise NotImplementedError
+	rows = frappe.get_all(
+		"Org Daily Stats",
+		filters={"date": target_date},
+		fields=["name", "date", "total_employees", "avg_hours_org", "avg_login_time_org"],
+		limit=1,
+	)
+	return rows[0] if rows else None
+
+
+def get_latest_org_daily_stats() -> dict[str, Any] | None:
+	"""Fetch the most recent `Org Daily Stats` row, for the landing dashboard tiles.
+
+	Args:
+	    None.
+
+	Returns:
+	    The most recent stats row as a dict, or None if none have been computed yet.
+	"""
+	rows = frappe.get_all(
+		"Org Daily Stats",
+		fields=["name", "date", "total_employees", "avg_hours_org", "avg_login_time_org"],
+		order_by="date desc",
+		limit=1,
+	)
+	return rows[0] if rows else None
 
 
 def upsert_employee_monthly_stats(
@@ -67,7 +153,26 @@ def upsert_employee_monthly_stats(
 	    avg_logout_time: recomputed average logout time for the month.
 	    days_present: number of days with a logged activity row this month.
 	"""
-	raise NotImplementedError
+	existing_name = frappe.db.get_value(
+		"Employee Monthly Stats", {"employee": employee_id, "year_month": year_month}, "name"
+	)
+
+	if existing_name:
+		doc = frappe.get_doc("Employee Monthly Stats", existing_name)
+	else:
+		doc = frappe.new_doc("Employee Monthly Stats")
+		doc.employee = employee_id
+		doc.year_month = year_month
+
+	doc.avg_hours = avg_hours
+	doc.avg_login_time = avg_login_time
+	doc.avg_logout_time = avg_logout_time
+	doc.days_present = days_present
+
+	if existing_name:
+		doc.save(ignore_permissions=True)
+	else:
+		doc.insert(ignore_permissions=True)
 
 
 def upsert_employee_overall_stats(
@@ -79,7 +184,7 @@ def upsert_employee_overall_stats(
 	"""Create or update the `Employee Overall Stats` row for one employee.
 
 	Called only from `jobs/recompute_overall_stats.py`, reading from
-	`Employee Monthly Stats` — never from raw activity logs.
+	`Employee Monthly Stats` - never from raw activity logs.
 
 	Args:
 	    employee_id: the `Employee.employee_id` value.
@@ -87,7 +192,23 @@ def upsert_employee_overall_stats(
 	    avg_login_time_overall: recomputed all-time average login time.
 	    avg_logout_time_overall: recomputed all-time average logout time.
 	"""
-	raise NotImplementedError
+	existing_name = frappe.db.get_value("Employee Overall Stats", {"employee": employee_id}, "name")
+
+	if existing_name:
+		doc = frappe.get_doc("Employee Overall Stats", existing_name)
+	else:
+		doc = frappe.new_doc("Employee Overall Stats")
+		doc.employee = employee_id
+
+	doc.avg_hours_overall = avg_hours_overall
+	doc.avg_login_time_overall = avg_login_time_overall
+	doc.avg_logout_time_overall = avg_logout_time_overall
+	doc.last_computed = now_datetime()
+
+	if existing_name:
+		doc.save(ignore_permissions=True)
+	else:
+		doc.insert(ignore_permissions=True)
 
 
 def upsert_org_daily_stats(
@@ -106,4 +227,19 @@ def upsert_org_daily_stats(
 	    avg_hours_org: org-wide average hours for this day.
 	    avg_login_time_org: org-wide average login time for this day.
 	"""
-	raise NotImplementedError
+	existing_name = frappe.db.get_value("Org Daily Stats", {"date": target_date}, "name")
+
+	if existing_name:
+		doc = frappe.get_doc("Org Daily Stats", existing_name)
+	else:
+		doc = frappe.new_doc("Org Daily Stats")
+		doc.date = target_date
+
+	doc.total_employees = total_employees
+	doc.avg_hours_org = avg_hours_org
+	doc.avg_login_time_org = avg_login_time_org
+
+	if existing_name:
+		doc.save(ignore_permissions=True)
+	else:
+		doc.insert(ignore_permissions=True)

@@ -96,22 +96,49 @@ the CEO experience is solid.
 
 ## 6. Functional deliverables (this phase)
 
-### 6.1 Executive Search & Landing Dashboard
-- Auto-completing search by employee name or ID (must stay responsive at 30K employees)
-- Org-wide summary tiles: headcount, average hours worked (org-wide, this month),
-  attendance consistency indicator
-- Employee summary card on search/select:
-  - Name, ID, Manager, Date of Joining
-  - Average time spent (overall + monthly)
-  - Average daily login time
-  - "View full history" action → Employee Detail Page
+> **⚠️ Correction note (post-review):** §6.1 originally described a "search →
+> employee summary card" flow, as if a search returns exactly one match. It doesn't:
+> at 30,000 employees, searching a common name like "Priya" can return **hundreds of
+> matches**. A single large card with inline charts per result does not scale — it
+> was replaced below with a paginated, filterable **employee list**. All rich
+> per-employee content (charts, averages, trend data) now lives **only** on the
+> Employee Detail Page (§6.2), reached by clicking a row. This also means the
+> per-employee visual "dashboard" — charts and trends, not just a plain table — is
+> explicitly part of §6.2, not a separate thing.
 
-### 6.2 Employee Detail Page
-- Summary metrics card: avg. time spent/day, avg. login time, avg. logout time,
+### 6.1 Executive Landing Page — Employee Directory
+- Org-wide summary tiles at the top: headcount, average hours worked (org-wide,
+  this month), attendance consistency indicator
+- Search bar (auto-completing by name or ID, must stay responsive at 30K employees)
+  plus lightweight filters (e.g. filter by manager, sort by name/hours) — filters and
+  search operate on the same underlying list
+- **Employee list, not a single result card:** a dense, paginated table/list of
+  matching employees. Each row is compact — no charts, no multi-line summary — just
+  the facts needed to identify and pick the right person:
+  - Avatar + Name + Employee ID
+  - Manager name
+  - Avg. hours/day (a single number, not a chart)
+  - Avg. login time
+  - Status (e.g. Active / On leave)
+- **Pagination is mandatory here, not optional** — with 30,000 employees, an
+  unfiltered or common-name search can return hundreds to thousands of rows. The
+  list always shows a page (e.g. 20–50 rows) with a "Showing X–Y of Z matches"
+  footer and Prev/Next controls, never an unbounded scroll of every match.
+- Clicking any row navigates to the Employee Detail Page (§6.2) — that page, not
+  the list, is where the depth lives.
+
+### 6.2 Employee Detail Page — the per-employee dashboard
+This is where all the rich, per-employee analytics live — charts, averages, and
+history — once the executive has picked a specific person from the list in §6.1.
+- **Summary metrics:** avg. time spent/day, avg. login time, avg. logout time,
   date of joining, manager
-- Daily activity log table: paginated, chronological, sortable
-- Date-range filter: This Week / This Month / Custom Range
-- Line-management context: manager chain shown (who this employee reports up to)
+- **Trend chart(s):** a visual view of the employee's hours/attendance over time
+  (not just numbers) — this is the "dashboard" feel for that one employee
+- **Daily activity log:** paginated, chronological, sortable table/list of
+  individual day-by-day check-in/check-out records
+- **Date-range filter:** This Week / This Month / Custom Range, applying to both
+  the trend chart and the activity log
+- **Line-management context:** manager chain shown (who this employee reports up to)
 
 ### 6.3 Org / Line-management view (scope addition)
 - Simple hierarchy view so an executive can see a manager and their reporting line
@@ -154,7 +181,7 @@ to clear first.
 | Phase | Deliverable |
 |---|---|
 | Phase 1 | DocTypes, seed data at scale (30K employees, 1 year of logs), core APIs |
-| Phase 2 | Web portal: search, summary card, detail page, filters |
+| Phase 2 | Web portal: search + filters, paginated employee list, detail page (with trend chart + activity log) |
 | Phase 3 | Aggregation/caching layer hardened for scale; pagination everywhere |
 | Phase 4 | Mobile app (own repo/architecture) against the same APIs |
 | Phase 5 (future) | AI chatbot — revisit this document, not started now |
