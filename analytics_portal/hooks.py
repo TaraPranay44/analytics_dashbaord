@@ -26,7 +26,15 @@ app_license = "mit"
 
 # include js, css files in header of desk.html
 # app_include_css = "/assets/analytics_portal/css/analytics_portal.css"
-# app_include_js = "/assets/analytics_portal/js/analytics_portal.js"
+#
+# Bare /desk cannot be redirected via hooks.py alone: Frappe's PathResolver
+# hardcodes any path starting with "desk" straight to the Desk template,
+# bypassing website_redirects and every other routing hook entirely
+# (frappe/website/path_resolver.py: "Hardcoded for better performance").
+# role_home_page (below) + User.default_workspace already cover the
+# login-time redirect; this JS covers someone landing on bare /desk
+# mid-session by reading that same frappe.boot.user.default_workspace.
+app_include_js = "/assets/analytics_portal/js/desk_default_workspace_redirect.js"
 
 # include js, css files in header of web template
 # web_include_css = "/assets/analytics_portal/css/analytics_portal.css"
@@ -59,10 +67,33 @@ app_license = "mit"
 # application home page (will override Website Settings)
 # home_page = "login"
 
+# Website Routes
+# --------------
+# Vue3 frontend (docs/05_FRONTEND_WEB_RULES.md) - built to
+# analytics_portal/public/frontend and served via analytics_portal/www.
+website_route_rules = [
+	{"from_route": "/analytics-portal/<path:app_path>", "to_route": "analytics-portal"},
+]
+
 # website user home page (by Role)
-# role_home_page = {
-# 	"Role": "home_page"
-# }
+# Data Admin (docs/07_DESK_UI_ROLE_ACCESS_PLAN.md): land straight on the
+# scoped "Employee Analytics Portal" workspace instead of Desk's default
+# empty landing page.
+role_home_page = {
+	"Data Admin": "desk/employee-analytics-portal",
+}
+
+# Fixtures
+# --------
+# Ship the Data Admin role and its Custom DocPerm grants (on core doctypes
+# this app doesn't own, e.g. Scheduled Job Log / RQ Job / Error Log) as
+# version-controlled fixtures rather than manual Desk edits, per
+# docs/07_DESK_UI_ROLE_ACCESS_PLAN.md. Run `bench export-fixtures` after
+# granting these in Desk to regenerate the JSON under fixtures/.
+fixtures = [
+	{"dt": "Role", "filters": [["name", "=", "Data Admin"]]},
+	{"dt": "Custom DocPerm", "filters": [["role", "=", "Data Admin"]]},
+]
 
 # Generators
 # ----------

@@ -72,6 +72,7 @@ def run(
 	commit: bool = True,
 	id_prefix: str = "EMP-",
 	batch_size: int = 1000,
+	start_index: int = 0,
 ) -> None:
 	"""Generate `employee_count` employees and `days` days of activity logs each.
 
@@ -91,16 +92,25 @@ def run(
 	    batch_size: how many employees (and that many x `days` activity log
 	        rows) to generate and commit per batch, so progress is visible -
 	        and durable - incrementally rather than only at the very end.
+	    start_index: numeric offset folded into generated employee_id values
+	        (`{id_prefix}{start_index + i:06d}`), so a resumed run can pick up
+	        where an earlier one left off without colliding on employee_id.
+	        The manager hierarchy generated in this run is always its own
+	        self-contained tree (its first employee has no manager) - it does
+	        not look up or reference employees from a previous run.
 	"""
 	started_at = now_datetime()
-	print(f"[seed] generating {employee_count} employees x {days} days of logs, in batches of {batch_size}")
+	print(
+		f"[seed] generating {employee_count} employees x {days} days of logs, "
+		f"in batches of {batch_size}, starting at index {start_index}"
+	)
 
 	employee_ids: list[str] = []
 	total_log_count = 0
 
 	for batch_start in range(0, employee_count, batch_size):
 		batch_end = min(batch_start + batch_size, employee_count)
-		new_ids = _generate_employee_batch(employee_ids, batch_start, batch_end, id_prefix)
+		new_ids = _generate_employee_batch(employee_ids, batch_start, batch_end, id_prefix, start_index)
 		employee_ids.extend(new_ids)
 
 		total_log_count += _generate_activity_logs(new_ids, days)
@@ -119,7 +129,11 @@ def run(
 
 
 def _generate_employee_batch(
-	existing_ids: list[str], batch_start: int, batch_end: int, id_prefix: str
+	existing_ids: list[str],
+	batch_start: int,
+	batch_end: int,
+	id_prefix: str,
+	start_index: int = 0,
 ) -> list[str]:
 	"""Bulk-insert Employee rows for the index range [batch_start, batch_end).
 
@@ -129,6 +143,7 @@ def _generate_employee_batch(
 	    batch_start: global index of the first employee in this batch.
 	    batch_end: global index one past the last employee in this batch.
 	    id_prefix: prefix for generated employee_id values.
+	    start_index: numeric offset folded into generated employee_id values.
 
 	Returns:
 	    The employee_id/name values generated in this batch, in order.
@@ -144,7 +159,7 @@ def _generate_employee_batch(
 
 	def rows() -> Iterator[tuple[Any, ...]]:
 		for i in range(batch_start, batch_end):
-			employee_id = f"{id_prefix}{i:06d}"
+			employee_id = f"{id_prefix}{start_index + i:06d}"
 			manager = pick_manager(i)
 			new_ids.append(employee_id)
 
