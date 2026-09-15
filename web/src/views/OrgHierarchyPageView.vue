@@ -7,7 +7,7 @@ import OrgHierarchyView from '../components/OrgHierarchyView.vue'
 const route = useRoute()
 const employeeId = computed(() => String(route.params.employeeId))
 
-const { hierarchy, isLoading, isError } = useOrgHierarchy(employeeId)
+const { managerChain, directReports, isLoading, isError } = useOrgHierarchy(employeeId)
 </script>
 
 <template>
@@ -22,7 +22,12 @@ const { hierarchy, isLoading, isError } = useOrgHierarchy(employeeId)
     <div v-else-if="isError" class="state-message state-message--error">
       Couldn't load the reporting structure.
     </div>
-    <OrgHierarchyView v-else-if="hierarchy" :node="hierarchy" />
+    <OrgHierarchyView
+  v-else
+  :manager-chain="managerChain"
+  :direct-reports="directReports"
+  :loading="isLoading"
+/>
   </div>
 </template>
 
